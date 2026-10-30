@@ -1,0 +1,57 @@
+/* A dry-brush mark at the paper's edge. Scrolling itself stays native. */
+html.paint-scrollbar-ready { scrollbar-width: none; }
+html.paint-scrollbar-ready::-webkit-scrollbar { display: none; }
+
+.paint-scrollbar {
+  position: fixed;
+  z-index: 10;
+  top: max(104px, env(safe-area-inset-top));
+  right: env(safe-area-inset-right, 0px);
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 28px;
+  outline: none;
+  /* Difference blending gives ink on paper and pale pigment on the dark
+     painting, including when the handle crosses both in the same stroke. */
+  color: #ded0b5;
+  mix-blend-mode: difference;
+  cursor: pointer;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s;
+}
+.paint-scrollbar.is-scrolling,
+.paint-scrollbar.is-dragging,
+.paint-scrollbar:focus-visible:not(.is-pointer-focus) { opacity: 1; pointer-events: auto; transition-duration: 0.16s; }
+.paint-scrollbar[hidden] { display: none; }
+.paint-scrollbar svg { display: block; width: 100%; height: 100%; pointer-events: none; }
+.paint-scrollbar__track { position: absolute; inset: 0; opacity: 0.28; }
+.paint-scrollbar__thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 44px;
+  cursor: grab;
+  touch-action: none;
+}
+.paint-scrollbar__thumb svg { width: 10px; margin: 0 auto; opacity: 0.78; transition: opacity 0.2s; }
+.paint-scrollbar:hover .paint-scrollbar__thumb svg,
+.paint-scrollbar:focus-visible .paint-scrollbar__thumb svg,
+.paint-scrollbar.is-dragging .paint-scrollbar__thumb svg { opacity: 1; }
+.paint-scrollbar.is-dragging, .paint-scrollbar.is-dragging .paint-scrollbar__thumb { cursor: grabbing; }
+.paint-scrollbar:focus-visible:not(.is-pointer-focus) { outline: 1px dashed currentColor; outline-offset: -3px; }
+@media (pointer: coarse) {
+  .paint-scrollbar { width: 24px; top: max(116px, env(safe-area-inset-top)); }
+  .paint-scrollbar__thumb svg { width: 7px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .paint-scrollbar, .paint-scrollbar__thumb svg { transition: none; }
+}
+@media print, (forced-colors: active) {
+  html.paint-scrollbar-ready { scrollbar-width: auto; }
+  html.paint-scrollbar-ready::-webkit-scrollbar { display: block; }
+  .paint-scrollbar { display: none; }
+}

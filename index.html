@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cyrine & Juan are getting married: Sunday, 23 May 2027, Gammarth, near Tunis.">
+  <title>Cyrine & Juan · 23 May 2027</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+  <link rel="preload" as="image" href="assets/images/live/01-sunset.jpg">
+  <link rel="stylesheet" href="home.css">
+  <link rel="stylesheet" href="scrollbar.css">
+  <script>
+    window.LIVING_PAPER = {
+      // Full-resolution masters, preserved without another image compression pass.
+      stills: ['assets/images/live/01-sunset.jpg', 'assets/images/live/02-dusk.jpg', 'assets/images/live/03-night.jpg'],
+      // The nightfall clip sets the sun, then brings out the stars.
+      // Land stays on the aligned paintings; water keeps its independent clock.
+      clips: ['assets/video/clips/12-sunset-to-dusk.mp4', 'assets/video/clips/23-nightfall-sun-stars.mp4'],
+      // One continuous water video; scroll changes only its smooth colour grade.
+      waterLoop: 'assets/video/clips/water-loop.mp4?v=rgb-1',
+      waterLighting: 'assets/images/live/water-lighting.png?v=4-sky',
+      mask: 'assets/images/live/live-mask.png?v=3-shore',
+      sky: 'assets/images/live/live-sky.png?v=4-trees',
+      aspect: 2400 / 1348,
+      // Screens of scroll: a short rest on the first scene so the sunset starts almost at once.
+      rest: [0.3, 0.6, 0.6],
+      transition: 0.9,
+      focusBand: 0.85,
+      // Wide screens: the painting covers the right side; where it melts into the paper (fraction of the width, top and bottom).
+      paperEdge: [0.33, 0.40],
+      // Which part of the image must reach the screen's top, right and bottom edges (the paintings end in their own
+      // washes before the image border; measured: paint stops past 0.96 on the right, past 0.94 at the bottom).
+      cover: { top: 0.015, right: 0.93, bottom: 0.90 },
+      // Things that light up when the cursor passes (lanterns on the beach, lit windows): [x, y, size] in painting coordinates.
+      lights: [
+        // Beach lanterns; checked against sunset (scripts/detect_lights.py).
+        [0.55549, 0.88739, 1.07], // beach 1
+        [0.64504, 0.84504, 0.94], // beach 2
+        [0.68573, 0.81649, 0.84], // beach 3
+        [0.74209, 0.78466, 0.76], // beach 4
+        [0.7772, 0.79141, 0.74], // beach 5
+        [0.79109, 0.73467, 0.61], // beach 6
+        [0.82036, 0.71937, 0.56], // beach 7
+        [0.83042, 0.74329, 0.63], // beach 8
+        [0.84371, 0.72664, 0.58], // beach 9
+        // Village windows, doorway and wall lamp; checked against sunset (scripts/detect_lights.py).
+        [0.91142, 0.38555, 0.32], // top left window
+        [0.91577, 0.38537, 0.32], // top right window
+        [0.97858, 0.39445, 0.22], // wall lamp
+        [0.80292, 0.45193, 0.32], // blue roof left
+        [0.80691, 0.45148, 0.32], // blue roof middle
+        [0.83345, 0.46267, 0.4], // small arched window
+        [0.85294, 0.46172, 0.5], // middle left window
+        [0.86501, 0.4618, 0.5], // middle right window
+        [0.88919, 0.45537, 0.5], // tall arched window
+        [0.93365, 0.4754, 0.5], // right shutter window
+        [0.84236, 0.52325, 0.4], // front left pane
+        [0.84844, 0.52168, 0.4], // front right pane
+        [0.88539, 0.51431, 0.5], // front middle window
+        [0.90999, 0.5193, 0.5], // front right window
+        [0.88488, 0.56532, 0.5], // lit doorway
+        // Shuttered windows: include the night painting's warm spill on the left walls; checked against sunset (scripts/detect_lights.py).
+        [0.75843, 0.51219, 0.7], // left small shutter
+        [0.77563, 0.51812, 1.2], // left tall shutter
+        [0.74842, 0.54375, 0.65], // left lower shutter
+        // Far-shore village lights; checked against sunset (scripts/detect_lights.py).
+        [0.50289, 0.58857, 0.1], // shore 1
+        [0.53652, 0.58365, 0.1], // shore 2
+        [0.56676, 0.58657, 0.1], // shore 3
+        [0.58826, 0.58468, 0.1], // shore 4
+        [0.58807, 0.58948, 0.1], // shore 5
+        [0.59575, 0.58915, 0.12], // shore 6
+        [0.61139, 0.5837, 0.1], // shore 7
+        [0.61587, 0.5858, 0.1], // shore 8
+        [0.62457, 0.58526, 0.1], // shore 9
+        [0.63322, 0.58791, 0.1], // shore 10
+        [0.63514, 0.5813, 0.1], // shore 11
+        [0.64682, 0.58353, 0.1], // shore 12
+        [0.65063, 0.58703, 0.12], // shore 13
+      ],
+      // Paper colour at each painting's edge, so the page and the painting meet without a seam.
+      paper: [[244, 234, 216], [246, 235, 219], [242, 228, 210]],
+      // Both lighting transitions ease at their ends; the sky video follows that light directly.
+      // Living motion, plus: the edge breathing (amount, period in seconds), the darker drying rim, wet paper under the
+      // cursor and while the light changes. ?tune on the page gives sliders for all of these.
+      motion: { water: 1, ripples: 1, sparkle: 1, speed: 1, trees: 0.5, gust: 0.5, breath: 1, breathPeriod: 8, rim: 0.5, wet: 1, wetChange: 0.5, dry: 0.15, wetTint: 0.5 },
+      // The painting blooms in on load like a watercolour wash, from the sun outward, over this many seconds.
+      bloom: 6.5,
+      seed: [0.62, 0.5]
+    };
+    // Start on bare paper, before images can flash ahead of the live reveal.
+    // If the renderer cannot start, leave the ordinary still-page fallback.
+    if (!location.hash && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('lp-opening');
+      setTimeout(() => document.documentElement.classList.remove('lp-opening'), 8000);
+    }
+  </script>
+  <script src="src/living-paper.js?v=3-soft-opening" defer></script>
+  <script src="src/cursor.js" defer></script>
+  <script src="src/scrollbar.js" defer></script>
+</head>
+<body>
+  <canvas id="paper" aria-hidden="true"></canvas>
+  <div class="lp-fallback" aria-hidden="true">
+    <img src="assets/images/live/01-sunset.jpg" alt="">
+    <img src="assets/images/live/02-dusk.jpg" alt="">
+    <img src="assets/images/live/03-night.jpg" alt="">
+  </div>
+
+  <header class="lp-header" data-tone="light">
+    <a class="lp-brand" href="#invitation">
+      <span class="lp-brand__names">Cyrine &amp; Juan</span>
+      <span class="lp-brand__line">23 May 2027 · Gammarth, Tunisia</span>
+    </a>
+    <nav class="lp-menu" aria-label="Site">
+      <a class="lp-button lp-button--primary" href="rsvp/">RSVP</a>
+    </nav>
+  </header>
+
+
+  <main id="track">
+    <span class="lp-anchor" id="invitation"></span>
+    <span class="lp-anchor" id="weekend"></span>
+    <span class="lp-anchor" id="logistics"></span>
+
+    <article class="lp-copy" aria-labelledby="h-invitation">
+      <p class="lp-eyebrow">You're invited</p>
+      <h1 id="h-invitation">Cyrine &amp; Juan are getting married</h1>
+      <p class="lp-sub">Sunday, 23 May 2027 · Gammarth, near Tunis</p>
+      <div class="lp-rsvp">
+        <p class="lp-actions"><a class="lp-button lp-button--big lp-button--primary" href="rsvp/">RSVP</a><a class="lp-link" href="#weekend">See the weekend</a></p>
+      </div>
+    </article>
+
+    <article class="lp-copy" aria-labelledby="h-weekend">
+      <p class="lp-eyebrow">The plans so far</p>
+      <h2 id="h-weekend">The weekend</h2>
+      <p class="lp-sub">21–24 May 2027 · Gammarth</p>
+      <ol class="lp-programme">
+        <li><b>Fri 21 May</b><span>Traditional Tunisian wedding</span></li>
+        <li><b>Sun 23 May</b><span>The wedding, under the stars</span></li>
+        <li><b>Mon 24 May</b><span>Farewell brunch</span></li>
+      </ol>
+      <p class="lp-note">Saturday is yours to explore. Times and venues will follow as plans are settled.</p>
+      <p class="lp-actions"><a class="lp-link" href="rsvp/">RSVP</a><a class="lp-link" href="logistics/#weekend">Weekend details</a></p>
+    </article>
+
+    <article class="lp-copy" aria-labelledby="h-logistics">
+      <p class="lp-eyebrow">Getting there</p>
+      <h2 id="h-logistics">Logistics</h2>
+      <dl class="lp-facts">
+        <dt>Fly into</dt><dd>Tunis–Carthage (TUN)</dd>
+        <dt>Transport</dt><dd>Shuttles planned</dd>
+        <dt>Where to stay</dt><dd><a class="lp-link" href="logistics/#stay">Three hotel ideas</a></dd>
+        <dt>What to wear</dt><dd><a class="lp-link" href="logistics/#wear">Friday &amp; Sunday</a></dd>
+      </dl>
+      <p class="lp-actions"><a class="lp-button lp-button--big" href="logistics/">All the details</a><a class="lp-link" href="rsvp/">RSVP</a></p>
+    </article>
+  </main>
+
+  <div class="lp-foot">
+    <span class="lp-hint" aria-hidden="true">scroll · time passes</span>
+    <span class="lp-progress" aria-hidden="true"><i></i></span>
+    <nav class="lp-scenes" aria-label="Scenes">
+      <a href="#invitation"><b>01</b> Invitation</a>
+      <a href="#weekend"><b>02</b> The weekend</a>
+      <a href="#logistics"><b>03</b> Logistics</a>
+    </nav>
+  </div>
+  <noscript><p class="lp-noscript">Cyrine &amp; Juan are getting married: Sunday, 23 May 2027, Gammarth, near Tunis. <a href="rsvp/">RSVP</a> · <a href="logistics/">Logistics</a></p></noscript>
+</body>
+</html>

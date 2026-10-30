@@ -1,0 +1,147 @@
+/* Home: the living painting. A fixed WebGL stage, the scene text on the painting's paper side, set like ink
+   on the same sheet: quiet serif, no labels in capitals, outlined buttons, paper grain over all. */
+:root {
+  --paper: #f4ead8;
+  --ink: #1e2a3b;
+  --ink-soft: #3a4556;
+  --muted: #68707d;
+  --accent: #2c4f80;
+  --line: rgba(30, 42, 59, 0.15);
+  --rule: rgba(30, 42, 59, 0.45);
+  --display: "Cormorant Garamond", Georgia, serif;
+  --text: "Source Serif 4", Georgia, serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 17px/1.6 var(--text); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+
+/* Paper grain over the whole page, so the page's paper and the painting's paper read as one sheet. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: 1; pointer-events: none; opacity: 0.3; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.52 0 0 0 0 0.44 0 0 0 0 0.32 0.55 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 280px 280px;
+}
+body.lp-nograin::before { display: none; }
+
+#paper, .lp-fallback { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+#paper { display: block; opacity: 0; transition: opacity 0.2s; }
+.lp-live #paper { opacity: 1; }
+.lp-fallback img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity 0.3s; }
+.lp-fallback img + img { opacity: 0; }
+.lp-live .lp-fallback { display: none; }
+/* Until the renderer is ready, the first view is paper rather than a full
+   painting that disappears again. No class is set for reduced motion/no JS. */
+.lp-opening .lp-fallback,
+.lp-opening .lp-copy:first-of-type { visibility: hidden !important; }
+body:not(.lp-band) .lp-fallback img { left: auto; right: 0; top: 0; width: auto; height: 100%; object-fit: cover; }
+
+#track { position: relative; z-index: 1; }
+.lp-anchor { position: absolute; left: 0; width: 1px; height: 1px; }
+
+.lp-header { position: fixed; z-index: 5; top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px 28px; padding: 26px 56px;
+  text-shadow: 0 0 4px var(--paper), 0 0 10px var(--paper); }
+.lp-brand { display: flex; flex-direction: column; gap: 5px; text-decoration: none; }
+.lp-brand__names { font: 500 31px/1 var(--display); letter-spacing: 0.01em; }
+.lp-brand__line { font: italic 400 16px/1.2 var(--display); color: var(--muted); }
+.lp-menu { display: flex; align-items: center; justify-content: flex-end; }
+.lp-button { display: inline-flex; align-items: center; padding: 10px 20px; border: 1px solid var(--rule); border-radius: 3px; background: transparent; color: var(--ink); text-decoration: none; font: 500 15px/1 var(--text); letter-spacing: 0.02em; transition: background-color 0.5s, border-color 0.5s; }
+.lp-button:hover { background: rgba(44, 79, 128, 0.09); border-color: var(--ink); }
+.lp-button--big { padding: 13px 26px; font-size: 16px; border-color: rgba(30, 42, 59, 0.7); }
+.lp-button--primary { justify-content: center; background: var(--ink); border-color: var(--ink); color: var(--paper); font-weight: 600; text-shadow: none; }
+.lp-button--primary:hover { background: var(--accent); border-color: var(--accent); }
+.lp-menu .lp-button--primary { min-width: 112px; min-height: 46px; font-size: 16px; transition: background-color 0.5s, border-color 0.5s, color 0.5s; }
+.lp-button--big.lp-button--primary { min-width: 164px; min-height: 52px; padding: 16px 32px; font-size: 18px; }
+/* The desktop button sits on the sky; the phone header always sits on paper. */
+body:not(.lp-band) .lp-header[data-tone="dark"] .lp-button--primary { background: var(--paper); border-color: var(--paper); color: var(--ink); }
+body:not(.lp-band) .lp-header[data-tone="dark"] .lp-button--primary:hover { background: #fff7e9; border-color: #fff7e9; }
+a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
+
+.lp-copy { position: fixed; z-index: 2; left: 5.5vw; top: 50%; transform: translateY(-46%); width: min(500px, 31vw); display: flex; flex-direction: column; gap: 14px; opacity: 0;
+  text-shadow: 0 0 4px var(--paper), 0 0 10px var(--paper), 0 0 18px rgba(244, 234, 216, 0.85); }
+.lp-copy .lp-button { text-shadow: none; }
+.lp-copy:first-of-type { opacity: 1; }
+.lp-eyebrow { margin: 0 0 -4px; font: italic 400 1.4rem/1.2 var(--display); color: var(--ink-soft); }
+.lp-copy h1, .lp-copy h2 { margin: 0; font: 500 clamp(2.8rem, 5.2vw, 4.6rem)/1 var(--display); letter-spacing: 0; }
+.lp-sub { margin: 0; font-size: 18px; font-style: italic; color: var(--ink-soft); }
+.lp-rsvp { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding-top: 22px; border-top: 1px solid var(--line); }
+.lp-rsvp p { margin: 0; }
+.lp-actions { margin: 4px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 14px 24px; }
+.lp-link { padding: 2px 0; border-bottom: 1px solid var(--rule); text-decoration: none; font-size: 15px; color: var(--ink-soft); transition: color 0.4s, border-color 0.4s; }
+.lp-link:hover { color: var(--ink); border-bottom-color: var(--ink); }
+.lp-programme { margin: 6px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.lp-programme li { display: flex; gap: 18px; align-items: baseline; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.lp-programme b { width: 118px; flex-shrink: 0; font-weight: 600; font-size: 15px; }
+.lp-programme span { flex: 1; font-size: 16px; }
+.lp-copy em { font: italic 400 15px/1 var(--display); color: var(--muted); text-transform: lowercase; }
+.lp-note { margin: 0; font-size: 15px; color: var(--ink-soft); }
+.lp-facts { margin: 6px 0 0; display: grid; grid-template-columns: 140px minmax(0, 1fr); border-top: 1px solid var(--line); }
+.lp-facts dt, .lp-facts dd { margin: 0; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.lp-facts dt { font-weight: 600; font-size: 15px; }
+.lp-facts dd { font-size: 16px; }
+
+.lp-foot { position: fixed; z-index: 3; left: 5.5vw; right: auto; bottom: 22px; display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 10px 22px; font: italic 400 15px/1 var(--display); color: var(--muted); text-shadow: 0 0 4px var(--paper), 0 0 10px var(--paper); }
+.lp-hint { pointer-events: none; transition: opacity 0.3s; }
+.lp-scenes { display: flex; gap: 20px; }
+.lp-scenes a { text-decoration: none; color: var(--muted); padding: 4px 0; border-bottom: 1px solid transparent; transition: color 0.3s, border-color 0.3s; }
+.lp-scenes a b { display: none; }
+.lp-scenes a:hover, .lp-scenes a[aria-current] { color: var(--ink); border-bottom-color: var(--rule); }
+.lp-progress { display: block; width: 110px; height: 1px; background: var(--line); }
+.lp-progress i { display: block; height: 1px; background: var(--ink-soft); transform: scaleX(0); transform-origin: left; }
+.lp-noscript { position: relative; z-index: 6; max-width: 40ch; margin: 30vh auto; padding: 0 24px; }
+
+/* Narrow or portrait screens: the painting is a band under the header; the text sits on paper below. */
+.lp-band .lp-header { align-items: center; gap: 12px; min-height: 92px; padding: 14px 20px; background: var(--paper); }
+.lp-band .lp-brand { min-width: 0; }
+.lp-band .lp-brand__names { font-size: 25px; }
+.lp-band .lp-brand__line { font-size: 13px; }
+.lp-band .lp-menu .lp-button--primary { min-width: 86px; min-height: 42px; font-size: 15px; }
+.lp-band .lp-button { padding: 8px 16px; }
+.lp-band #paper, .lp-band .lp-fallback { top: 92px; height: 40svh; bottom: auto; }
+.lp-band .lp-scenes { display: none; }
+.lp-band .lp-copy { left: 20px; right: 20px; width: auto; top: calc(92px + 40svh + 14px); transform: none; gap: 10px; text-shadow: none; }
+.lp-band .lp-eyebrow { font-size: 1.2rem; }
+.lp-band .lp-copy h1, .lp-band .lp-copy h2 { font-size: clamp(2.1rem, 9.5vw, 2.8rem); }
+.lp-band .lp-sub { font-size: 16px; }
+.lp-band .lp-rsvp { margin-top: 2px; padding-top: 12px; gap: 10px; }
+.lp-band .lp-rsvp p { font-size: 16px; }
+.lp-band .lp-button--big { padding: 11px 22px; font-size: 15px; }
+.lp-band .lp-programme li { padding: 9px 0; gap: 10px; }
+.lp-band .lp-programme b { width: auto; font-size: 14px; }
+.lp-band .lp-programme span { font-size: 14px; }
+.lp-band .lp-note { display: none; }
+.lp-band .lp-facts { grid-template-columns: 104px minmax(0, 1fr); }
+.lp-band .lp-facts dt, .lp-band .lp-facts dd { padding: 7px 0; font-size: 14px; }
+.lp-band .lp-foot { left: 20px; right: 20px; bottom: 12px; justify-content: center; text-shadow: none; }
+
+/* ?tune: the sliders, only on the real page while Juan sets the numbers. */
+.lp-tune { position: fixed; z-index: 9; right: 16px; bottom: 56px; width: 280px; max-height: calc(100vh - 80px); overflow: auto; padding: 12px 14px; border: 1px solid var(--line); border-radius: 6px; background: rgba(244, 234, 216, 0.96); font: 400 13px/1.4 var(--text); display: flex; flex-direction: column; gap: 6px; }
+.lp-tune b { font-weight: 600; }
+.lp-tune label { display: grid; grid-template-columns: 1fr 44px; gap: 2px 8px; align-items: center; }
+.lp-tune input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+.lp-tune output { text-align: right; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.lp-tune button { margin-top: 4px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 3px; background: transparent; font: inherit; cursor: pointer; }
+.lp-tune code { white-space: pre-wrap; word-break: break-all; font-size: 11px; color: var(--muted); }
+
+/* The cursor: an ink drop that follows the pointer, lengthens along its motion like a drop of water, grows over
+   links and sits a little wider on the painting. Only where there is a fine pointer; never on touch screens. */
+@media (hover: hover) and (pointer: fine) {
+  body.lp-cursor, body.lp-cursor * { cursor: none !important; }
+  /* Drawn in paper colour with difference blending: ink on the paper, pale on the night sky. */
+  .lp-cursor-dot { position: fixed; z-index: 11; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 1px solid rgba(244, 234, 216, 0.8); border-radius: 50%; background: rgba(244, 234, 216, 0); pointer-events: none; mix-blend-mode: difference; opacity: 0; will-change: transform;
+    transition: opacity 0.3s, width 0.25s, height 0.25s, margin 0.25s, background-color 0.25s, border-color 0.25s; }
+  .lp-cursor-dot::before { content: ""; position: absolute; inset: 4px; border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%; background: rgba(244, 234, 216, 0.1); animation: lp-drop 7s ease-in-out infinite; }
+  .lp-cursor-dot.is-on { opacity: 1; }
+  .lp-cursor-dot.is-paint { width: 30px; height: 30px; margin: -15px 0 0 -15px; border-color: rgba(244, 234, 216, 0.55); }
+  /* Over a link the ring closes into a pen tip: a small solid ink dot, nothing grows. */
+  .lp-cursor-dot.is-link { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-color: transparent; background: rgba(244, 234, 216, 0.95); }
+  .lp-cursor-dot.is-link::before { display: none; }
+  .lp-cursor-dot.is-down { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-color: transparent; background: rgba(244, 234, 216, 1); }
+  @keyframes lp-drop {
+    0%, 100% { border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%; }
+    33% { border-radius: 53% 47% 45% 55% / 48% 55% 45% 52%; }
+    66% { border-radius: 48% 52% 55% 45% / 55% 47% 53% 45%; }
+  }
+}
+@media (prefers-reduced-motion: reduce) { .lp-cursor-dot { display: none; } body.lp-cursor, body.lp-cursor * { cursor: auto !important; } }

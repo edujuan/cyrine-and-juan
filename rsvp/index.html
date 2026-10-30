@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="RSVP for Cyrine & Juan's wedding: Sunday, 23 May 2027, Gammarth, near Tunis.">
+  <title>RSVP · Cyrine & Juan</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+  <link rel="stylesheet" href="../site.css">
+  <link rel="stylesheet" href="../scrollbar.css">
+  <script src="../src/scrollbar.js" defer></script>
+  <script src="rsvp.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="../">Cyrine &amp; Juan</a>
+    <nav class="menu" aria-label="Site">
+      <a class="is-primary" href="./" aria-current="page">RSVP</a>
+    </nav>
+  </header>
+  <div class="hero"><img src="../assets/images/pages/rsvp-sunset.webp" alt="" width="1600" height="900" fetchpriority="high"></div>
+
+  <main>
+    <div class="page-head">
+      <p class="eyebrow">RSVP</p>
+      <h1>Will you be there?</h1>
+      <p class="lede">Sunday, 23 May 2027 · Gammarth, near Tunis. Please reply by <strong><time datetime="2027-01-01">1 January 2027</time></strong>.</p>
+    </div>
+
+    <p class="preview-note" id="form-preview" hidden>RSVP is not open yet. This form is a preview and does not send your answer.</p>
+
+    <!-- Responses will go to a spreadsheet. Set data-endpoint when its form integration is connected; empty means preview only. -->
+    <form id="rsvp" data-endpoint="" novalidate>
+      <div class="field">
+        <label for="names">Your name(s)</label>
+        <span class="hint" id="names-hint">Plus-ones and children are welcome. Please list everyone in your party, including children.</span>
+        <input id="names" name="names" type="text" autocomplete="name" required aria-describedby="names-hint">
+      </div>
+
+      <fieldset>
+        <legend>Will you join us?</legend>
+        <div class="choices">
+          <label class="choice"><input type="radio" name="attending" value="yes" required><span>Joyfully, yes</span></label>
+          <label class="choice"><input type="radio" name="attending" value="no"><span>Sadly, no</span></label>
+        </div>
+      </fieldset>
+
+      <div class="field if-attending" hidden>
+        <label for="diet">Any dietary needs or allergies?</label>
+        <input id="diet" name="diet" type="text">
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <span class="hint" id="email-hint">So we can send you the details as they're settled.</span>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required aria-describedby="email-hint">
+      </div>
+
+      <div class="field">
+        <label for="whatsapp">WhatsApp number <span class="hint">(optional)</span></label>
+        <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" placeholder="+49 …">
+      </div>
+
+      <label class="check"><input type="checkbox" name="updates" value="yes" checked><span>Keep me updated as plans are confirmed</span></label>
+
+      <div class="field">
+        <label for="note">A note for us <span class="hint">(optional)</span></label>
+        <textarea id="note" name="note"></textarea>
+      </div>
+
+      <p class="form-error" id="form-error" role="alert" hidden></p>
+      <button type="submit">Send my RSVP</button>
+    </form>
+
+    <div class="thanks" id="thanks" hidden tabindex="-1">
+      <h2>Thank you!</h2>
+      <p id="thanks-yes">We've got your answer, and we can't wait to celebrate with you under the stars.</p>
+      <p id="thanks-no" hidden>We've got your answer. We'll miss you, and we'll be thinking of you on the day.</p>
+      <p id="thanks-updates">We'll keep you posted as details are confirmed.</p>
+      <p><a href="../logistics/">Next: plan your trip →</a></p>
+      <p class="preview-note" id="preview-note" hidden>This was a preview. Your answer has not been sent; please return when RSVPs open.</p>
+    </div>
+  </main>
+
+  <footer class="site-footer"><strong>Cyrine &amp; Juan</strong>Sunday, 23 May 2027 · Gammarth</footer>
+</body>
+</html>
