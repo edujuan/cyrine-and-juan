@@ -32,12 +32,16 @@
 
     <p class="preview-note" id="form-preview" hidden>RSVP is not open yet. This form is a preview and does not send your answer.</p>
 
-    <!-- Responses will go to a spreadsheet. Set data-endpoint when its form integration is connected; empty means preview only. -->
-    <form id="rsvp" data-endpoint="" novalidate>
+    <!-- The receiver confirms each write to the private RSVP sheet. An empty endpoint restores preview mode. -->
+    <form id="rsvp" data-endpoint="https://script.google.com/macros/s/AKfycbxpFoQnOnX4J_jptMHx4YOT_jDBx84tIv1pjq_nN8RtyX0eG0kTPHxk4KIJcfTwGJGexg/exec" method="post" novalidate>
+      <div class="form-trap" aria-hidden="true">
+        <label for="website">Leave this field empty</label>
+        <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+      </div>
       <div class="field">
         <label for="names">Your name(s)</label>
         <span class="hint" id="names-hint">Plus-ones and children are welcome. Please list everyone in your party, including children.</span>
-        <input id="names" name="names" type="text" autocomplete="name" required aria-describedby="names-hint">
+        <input id="names" name="names" type="text" autocomplete="name" maxlength="500" required aria-describedby="names-hint">
       </div>
 
       <fieldset>
@@ -50,25 +54,25 @@
 
       <div class="field if-attending" hidden>
         <label for="diet">Any dietary needs or allergies?</label>
-        <input id="diet" name="diet" type="text">
+        <input id="diet" name="diet" type="text" maxlength="1000">
       </div>
 
       <div class="field">
         <label for="email">Email</label>
         <span class="hint" id="email-hint">So we can send you the details as they're settled.</span>
-        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required aria-describedby="email-hint">
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required aria-describedby="email-hint">
       </div>
 
       <div class="field">
         <label for="whatsapp">WhatsApp number <span class="hint">(optional)</span></label>
-        <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" placeholder="+49 …">
+        <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" maxlength="50" placeholder="+49 …">
       </div>
 
       <label class="check"><input type="checkbox" name="updates" value="yes" checked><span>Keep me updated as plans are confirmed</span></label>
 
       <div class="field">
         <label for="note">A note for us <span class="hint">(optional)</span></label>
-        <textarea id="note" name="note"></textarea>
+        <textarea id="note" name="note" maxlength="3000"></textarea>
       </div>
 
       <p class="form-error" id="form-error" role="alert" hidden></p>
