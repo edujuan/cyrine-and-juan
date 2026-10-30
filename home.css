@@ -53,7 +53,7 @@ body:not(.lp-band) .lp-fallback img { left: auto; right: 0; top: 0; width: auto;
 .lp-button--primary:hover { background: var(--accent); border-color: var(--accent); }
 .lp-menu .lp-button--primary { min-width: 112px; min-height: 46px; font-size: 16px; transition: background-color 0.5s, border-color 0.5s, color 0.5s; }
 .lp-button--big.lp-button--primary { min-width: 164px; min-height: 52px; padding: 16px 32px; font-size: 18px; }
-/* The desktop button sits on the sky; the phone header always sits on paper. */
+/* The desktop button sits on the sky. */
 body:not(.lp-band) .lp-header[data-tone="dark"] .lp-button--primary { background: var(--paper); border-color: var(--paper); color: var(--ink); }
 body:not(.lp-band) .lp-header[data-tone="dark"] .lp-button--primary:hover { background: #fff7e9; border-color: #fff7e9; }
 a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
@@ -91,16 +91,14 @@ a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
 .lp-progress i { display: block; height: 1px; background: var(--ink-soft); transform: scaleX(0); transform-origin: left; }
 .lp-noscript { position: relative; z-index: 6; max-width: 40ch; margin: 30vh auto; padding: 0 24px; }
 
-/* Narrow or portrait screens: the painting is a band under the header; the text sits on paper below. */
-.lp-band .lp-header { align-items: center; gap: 12px; min-height: 92px; padding: 14px 20px; background: var(--paper); }
-.lp-band .lp-brand { min-width: 0; }
-.lp-band .lp-brand__names { font-size: 25px; }
-.lp-band .lp-brand__line { font-size: 13px; }
-.lp-band .lp-menu .lp-button--primary { min-width: 86px; min-height: 42px; font-size: 15px; }
+/* Narrow or portrait screens start with the painting; the invitation and RSVP sit below. */
+/* Hide the bar before the runtime applies lp-band, including on the first paint. */
+@media (max-aspect-ratio: 23/20) { .lp-header { display: none; } }
+.lp-band .lp-header { display: none; }
 .lp-band .lp-button { padding: 8px 16px; }
-.lp-band #paper, .lp-band .lp-fallback { top: 92px; height: 40svh; bottom: auto; }
+.lp-band #paper, .lp-band .lp-fallback { top: 0; height: 40svh; bottom: auto; }
 .lp-band .lp-scenes { display: none; }
-.lp-band .lp-copy { left: 20px; right: 20px; width: auto; top: calc(92px + 40svh + 14px); transform: none; gap: 10px; text-shadow: none; }
+.lp-band .lp-copy { left: 20px; right: 20px; width: auto; top: calc(40svh + 14px); transform: none; gap: 10px; text-shadow: none; }
 .lp-band .lp-eyebrow { font-size: 1.2rem; }
 .lp-band .lp-copy h1, .lp-band .lp-copy h2 { font-size: clamp(2.1rem, 9.5vw, 2.8rem); }
 .lp-band .lp-sub { font-size: 16px; }
