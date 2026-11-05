@@ -108,7 +108,7 @@ a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
 .lp-band .lp-programme li { padding: 9px 0; gap: 10px; }
 .lp-band .lp-programme b { width: auto; font-size: 14px; }
 .lp-band .lp-programme span { font-size: 14px; }
-.lp-band .lp-note { display: none; }
+.lp-band .lp-note { font-size: 14px; }
 .lp-band .lp-facts { grid-template-columns: 104px minmax(0, 1fr); }
 .lp-band .lp-facts dt, .lp-band .lp-facts dd { padding: 7px 0; font-size: 14px; }
 .lp-band .lp-foot { left: 20px; right: 20px; bottom: 12px; justify-content: center; text-shadow: none; }
@@ -129,17 +129,14 @@ a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
   /* Drawn in paper colour with difference blending: ink on the paper, pale on the night sky. */
   .lp-cursor-dot { position: fixed; z-index: 11; left: 0; top: 0; width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 1px solid rgba(244, 234, 216, 0.8); border-radius: 50%; background: rgba(244, 234, 216, 0); pointer-events: none; mix-blend-mode: difference; opacity: 0; will-change: transform;
     transition: opacity 0.3s, width 0.25s, height 0.25s, margin 0.25s, background-color 0.25s, border-color 0.25s; }
-  .lp-cursor-dot::before { content: ""; position: absolute; inset: 4px; border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%; background: rgba(244, 234, 216, 0.1); animation: lp-drop 7s ease-in-out infinite; }
+  /* The drop's slow wobble (7 s, eased between three shapes) is set by cursor.js through --drop, 15 times a second:
+     a CSS animation of border-radius would restyle and recomposite the page on every screen refresh. */
+  .lp-cursor-dot::before { content: ""; position: absolute; inset: 4px; border-radius: var(--drop, 46% 54% 52% 48% / 52% 46% 54% 48%); background: rgba(244, 234, 216, 0.1); }
   .lp-cursor-dot.is-on { opacity: 1; }
   .lp-cursor-dot.is-paint { width: 30px; height: 30px; margin: -15px 0 0 -15px; border-color: rgba(244, 234, 216, 0.55); }
   /* Over a link the ring closes into a pen tip: a small solid ink dot, nothing grows. */
   .lp-cursor-dot.is-link { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-color: transparent; background: rgba(244, 234, 216, 0.95); }
   .lp-cursor-dot.is-link::before { display: none; }
   .lp-cursor-dot.is-down { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-color: transparent; background: rgba(244, 234, 216, 1); }
-  @keyframes lp-drop {
-    0%, 100% { border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%; }
-    33% { border-radius: 53% 47% 45% 55% / 48% 55% 45% 52%; }
-    66% { border-radius: 48% 52% 55% 45% / 55% 47% 53% 45%; }
-  }
 }
 @media (prefers-reduced-motion: reduce) { .lp-cursor-dot { display: none; } body.lp-cursor, body.lp-cursor * { cursor: auto !important; } }

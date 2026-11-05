@@ -167,17 +167,25 @@
         float lamp = 0.18 + 0.25 * noise(uv * vec2(46.0, 40.0));
         float k = lb > la + 0.04 ? smoothstep(lamp, lamp + 0.5, blend) : blend;
         c = mix(c, b, k);
-      } else {
+      } else if (sceneMix != 0.0) {
         c = mix(c, texture2D(stillB, q).rgb, sceneMix);
       }
       // The time-lapse shifts the cliff and beach contours slightly. Keep all
       // land on the aligned paintings; only the sky uses the scrolling clip.
       // The water has its own continuous video and an exact shoreline mask.
-      return mix(c, texture2D(clip, q).rgb, clipWeight * skyMask(q));
+      // (Weights of exactly zero skip their texture reads: mix(a, b, 0.0) is a.)
+      if (clipWeight != 0.0) c = mix(c, texture2D(clip, q).rgb, clipWeight * skyMask(q));
+      return c;
     }
     void main(){
       // The painting hangs in "frame" on the page (or fills the canvas on phones, cropped by "rect").
       vec2 uv = rect.xy + ((v - frame.xy) / frame.zw) * rect.zw;
+      // Shortcuts that cannot change a pixel. The ragged edge moves the torn cut by at most
+      // |rag + br| * 2.5 (rag within 0.066, the breath within 0.0075 * breath), plus a margin.
+      float slack = (0.067 + 0.0075 * abs(breath)) * 2.5 + 0.001;
+      float dx0 = wide > 0.5 ? (v.x - mix(cut.x, cut.y, v.y)) * screenAspect : 1.0;
+      // Off the sheet, or so far left of the cut that the painting's weight there is exactly 0: bare paper.
+      if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0 || dx0 + slack <= -0.16) { gl_FragColor = vec4(paper, 1.0); return; }
       vec4 m = texture2D(mask, uv);
       float near = clamp((uv.y - 0.595) / 0.33, 0.0, 1.0);
       float s = t * speed;
@@ -218,9 +226,14 @@
       // Cursor wetting still works on the sea; scrolling must not introduce
       // another moving wash over the independently playing water.
       float scrollWet = wetAll * (1.0 - m.r * waterClipWeight);
-      float wraw = clamp(texture2D(wetMap, uv).r * wet + scrollWet * (0.3 + 0.7 * noise(uv * vec2(6.0, 4.0) + t * 0.05)), 0.0, 1.0);
-      float wn = noise(uv * vec2(26.0, 19.0) + 3.0) * 0.55 + noise(uv * vec2(80.0, 58.0) + 9.0) * 0.45;
-      float w = smoothstep(0.06, 0.45, wraw + (wn - 0.5) * 0.4 * smoothstep(0.0, 0.25, wraw));
+      float wraw = texture2D(wetMap, uv).r * wet;
+      if (scrollWet != 0.0) wraw += scrollWet * (0.3 + 0.7 * noise(uv * vec2(6.0, 4.0) + t * 0.05));
+      wraw = clamp(wraw, 0.0, 1.0);
+      float w = 0.0;
+      if (wraw > 0.0) {
+        float wn = noise(uv * vec2(26.0, 19.0) + 3.0) * 0.55 + noise(uv * vec2(80.0, 58.0) + 9.0) * 0.45;
+        w = smoothstep(0.06, 0.45, wraw + (wn - 0.5) * 0.4 * smoothstep(0.0, 0.25, wraw));
+      }
       float lum = dot(c, vec3(0.299, 0.587, 0.114));
       // How much pigment lies here: bare paper and pale sky carry almost none, so water only deepens where there
       // is paint; on the pale parts it only brings their own colour back.
@@ -231,18 +244,20 @@
       c = mix(dryC, wetC, w);
       float rimW = smoothstep(0.0, 0.3, w) * (1.0 - smoothstep(0.3, 0.75, w));
       c *= 1.0 - 0.05 * rimW * (0.25 + 0.75 * pig);
-      // Ink ripple strokes and sparkle on warm light.
-      float sway = sin(s * 0.55 + floor(row) * 1.7) * 0.025 + s * 0.006;
-      float nz = noise(vec2((uv.x + sway) * (10.0 + 26.0 * (1.0 - near)), row));
-      float line = smoothstep(0.60, 0.68, nz) * (1.0 - smoothstep(0.68, 0.76, nz));
-      float lit = noise(vec2((uv.x - sway * 0.8) * (8.0 + 20.0 * (1.0 - near)) + 13.0, row + 0.5));
-      float glow = smoothstep(0.70, 0.76, lit) * (1.0 - smoothstep(0.76, 0.84, lit));
-      float r = ripples * m.r * (0.35 + 0.65 * near) * (1.0 - waterClipWeight);
-      c *= 1.0 - 0.22 * line * r;
-      c = mix(c, vec3(0.97, 0.95, 0.90), 0.28 * glow * r);
-      float warm = smoothstep(0.07, 0.17, c.r - c.b);
-      float sp = pow(noise(vec2(uv.x * 90.0 + s * 0.5, uv.y * 300.0 - s * 0.25)), 18.0) * 9.0;
-      c += vec3(1.0, 0.9, 0.7) * sp * warm * m.r * sparkle * 0.55 * (1.0 - waterClipWeight);
+      // Ink ripple strokes and sparkle on warm light (until the water video plays, which replaces them).
+      if (m.r * (1.0 - waterClipWeight) != 0.0) {
+        float sway = sin(s * 0.55 + floor(row) * 1.7) * 0.025 + s * 0.006;
+        float nz = noise(vec2((uv.x + sway) * (10.0 + 26.0 * (1.0 - near)), row));
+        float line = smoothstep(0.60, 0.68, nz) * (1.0 - smoothstep(0.68, 0.76, nz));
+        float lit = noise(vec2((uv.x - sway * 0.8) * (8.0 + 20.0 * (1.0 - near)) + 13.0, row + 0.5));
+        float glow = smoothstep(0.70, 0.76, lit) * (1.0 - smoothstep(0.76, 0.84, lit));
+        float r = ripples * m.r * (0.35 + 0.65 * near) * (1.0 - waterClipWeight);
+        c *= 1.0 - 0.22 * line * r;
+        c = mix(c, vec3(0.97, 0.95, 0.90), 0.28 * glow * r);
+        float warm = smoothstep(0.07, 0.17, c.r - c.b);
+        float sp = pow(noise(vec2(uv.x * 90.0 + s * 0.5, uv.y * 300.0 - s * 0.25)), 18.0) * 9.0;
+        c += vec3(1.0, 0.9, 0.7) * sp * warm * m.r * sparkle * 0.55 * (1.0 - waterClipWeight);
+      }
       // Things that light up when the cursor passes: a lantern or a window comes on the way it is lit in the night
       // painting (the lights are aligned): where the night painting is warm within the lamp's reach, that colour
       // shows through (the pane turns yellow, the lantern body glows, the sand catches a pool of light), with a
@@ -317,28 +332,33 @@
       vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
       // Distance to the nearest border in painting-height units, so the ragged band is as wide on every side.
       float edge = wide > 0.5 ? uv.x * aspect : min(min(uv.x, 1.0 - uv.x) * aspect, min(uv.y, 1.0 - uv.y));
-      // A ragged watercolour edge, so a dark wash that reaches the border never ends in a straight cut. Its
-      // shape never drifts (that looked wrong); it only breathes: the wash swells and settles, slowly, each
-      // stretch of the border in its own time, softer on the swell as if wet again, with a shade darker rim
-      // just inside where the pigment dried. The fade always reaches bare paper before the border.
-      float rag = (noise(uv * vec2(9.0, 6.0) + 3.1) - 0.5) * 0.09
-                + (noise(uv * vec2(34.0, 26.0)) - 0.5) * 0.03
-                + (noise(uv * vec2(140.0, 110.0)) - 0.5) * 0.012;
-      float ph = noise(uv * vec2(2.4, 1.7) + 11.0) * 4.0;
-      float cyc = sin(t * 6.2832 / breathPeriod + ph);
-      float br = breath * 0.0075 * (0.65 * cyc + 0.35 * sin(t * 6.2832 / (breathPeriod * 1.618) + ph * 0.5 + 1.0));
-      float reach = clamp(0.045 + rag + br, 0.02, 0.1);
-      float soft = 0.014 + 0.005 * breath * (0.5 + 0.5 * cyc);
-      float rimBand = smoothstep(reach, reach + 0.012, edge) * (1.0 - smoothstep(reach + 0.012, reach + 0.045, edge));
-      c *= 1.0 - 0.07 * rim * rimBand;
-      // Where the painting is on the sheet (1 inside, fading to 0 at its ragged edge).
-      float sheet = inside.x * inside.y * smoothstep(reach - soft, reach + 0.006, edge);
-      if (wide > 0.5) {
-        // Full-screen painting: on the text side it melts into the paper along a soft, torn, slightly slanted line
-        // that breathes with the edges, a faint dried rim along it.
-        float dx = (v.x - mix(cut.x, cut.y, v.y)) * screenAspect + (rag + br) * 2.5;
-        sheet *= smoothstep(-0.16, 0.02, dx);
-        c *= 1.0 - 0.05 * rim * smoothstep(0.0, 0.03, dx) * (1.0 - smoothstep(0.03, 0.09, dx));
+      float sheet = inside.x * inside.y;
+      // Away from every border (edge >= 0.146 > reach + 0.045) and well right of the cut, the sheet is exactly 1
+      // and both rims exactly 0, so the ragged edge's noise is only computed near them.
+      if (edge < 0.146 || dx0 - slack < 0.09) {
+        // A ragged watercolour edge, so a dark wash that reaches the border never ends in a straight cut. Its
+        // shape never drifts (that looked wrong); it only breathes: the wash swells and settles, slowly, each
+        // stretch of the border in its own time, softer on the swell as if wet again, with a shade darker rim
+        // just inside where the pigment dried. The fade always reaches bare paper before the border.
+        float rag = (noise(uv * vec2(9.0, 6.0) + 3.1) - 0.5) * 0.09
+                  + (noise(uv * vec2(34.0, 26.0)) - 0.5) * 0.03
+                  + (noise(uv * vec2(140.0, 110.0)) - 0.5) * 0.012;
+        float ph = noise(uv * vec2(2.4, 1.7) + 11.0) * 4.0;
+        float cyc = sin(t * 6.2832 / breathPeriod + ph);
+        float br = breath * 0.0075 * (0.65 * cyc + 0.35 * sin(t * 6.2832 / (breathPeriod * 1.618) + ph * 0.5 + 1.0));
+        float reach = clamp(0.045 + rag + br, 0.02, 0.1);
+        float soft = 0.014 + 0.005 * breath * (0.5 + 0.5 * cyc);
+        float rimBand = smoothstep(reach, reach + 0.012, edge) * (1.0 - smoothstep(reach + 0.012, reach + 0.045, edge));
+        c *= 1.0 - 0.07 * rim * rimBand;
+        // Where the painting is on the sheet (1 inside, fading to 0 at its ragged edge).
+        sheet *= smoothstep(reach - soft, reach + 0.006, edge);
+        if (wide > 0.5) {
+          // Full-screen painting: on the text side it melts into the paper along a soft, torn, slightly slanted line
+          // that breathes with the edges, a faint dried rim along it.
+          float dx = dx0 + (rag + br) * 2.5;
+          sheet *= smoothstep(-0.16, 0.02, dx);
+          c *= 1.0 - 0.05 * rim * smoothstep(0.0, 0.03, dx) * (1.0 - smoothstep(0.03, 0.09, dx));
+        }
       }
       float k = sheet;
       // One connected wash spreads from the sun. Vary its radius by direction,
@@ -457,18 +477,41 @@
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   let wetRead = 0;
 
+  // ---- Frame pacing. While something answers the reader (scrolling, the cursor and the paper it wets, lit
+  // lanterns, the bloom, a shooting star), every screen refresh is drawn. At rest the only motion left is
+  // slow (the water video at 24 frames a second, the pines, the breathing edge), so the page draws when the
+  // water has a new frame, or 24 times a second without it, instead of 120 times a second on a ProMotion
+  // screen. Nothing is drawn while the tab is hidden.
+  const REST_FPS = 24;
+  let pending = 0, sleepTimer = 0, running = false;
+  function wake() {
+    if (!running || document.hidden) return;
+    if (sleepTimer) { clearTimeout(sleepTimer); sleepTimer = 0; }
+    if (!pending) pending = requestAnimationFrame(frame);
+  }
+  function rest(fallbackMs) {
+    if (document.hidden) return;
+    sleepTimer = setTimeout(() => { sleepTimer = 0; wake(); }, fallbackMs);
+  }
+  document.addEventListener('visibilitychange', wake);
+
   // Time-lapse clips: seeked to the scroll position, uploaded as a texture while a transition is on screen.
   // Loaded as blobs, so seeking works even on hosts that don't answer byte-range requests.
+  // They are fetched once the paintings are in (see below), so they never compete with the first view.
   const clips = cfg.clips.map((src) => {
     if (!src) return null;  // no clip: the transition is drawn from the two paintings
     const video = document.createElement('video');
     Object.assign(video, { muted: true, playsInline: true, preload: 'auto' });
-    fetch(src).then(r => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
-      .then(blob => { video.src = URL.createObjectURL(blob); })
-      .catch(() => {});
-    return { video, ready: false, wanted: 0 };
+    return { video, src, ready: false, wanted: 0 };
   });
-  clips.filter(Boolean).forEach((c) => { c.video.addEventListener('loadeddata', () => { c.ready = true; seekClip(rendered); }); c.video.addEventListener('seeked', () => { c.fresh = true; }); });
+  function loadClips() {
+    clips.filter(Boolean).forEach((c) => {
+      fetch(c.src).then(r => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+        .then(blob => { c.video.src = URL.createObjectURL(blob); })
+        .catch(() => {});
+    });
+  }
+  clips.filter(Boolean).forEach((c) => { c.video.addEventListener('loadeddata', () => { c.ready = true; seekClip(rendered); wake(); }); c.video.addEventListener('seeked', () => { c.fresh = true; wake(); }); });
   function seekClip(s) {
     if (!gl || !clips.length || s.clip < 0) return;
     const c = clips[s.clip];
@@ -487,13 +530,24 @@
   let waterPending = false, waterBlocked = false, waterReadyAt = 0;
   let waterTime = -1, waterHasFrame = false, waterWeight = 0;
   let waterAtlasReady = false, waterGradeSize = [1, 1];
-  if (waterVideo) {
-    Object.assign(waterVideo, { muted: true, playsInline: true, preload: 'auto', loop: true });
-    fetch(cfg.waterLoop).then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
+  // A new water frame is uploaded only when the video has presented one (24 a second), not on every redraw.
+  const frameCallbacks = !!(waterVideo && waterVideo.requestVideoFrameCallback);
+  let waterFresh = false, waterCallbackAt = 0;
+  function loadWater() {
+    if (!waterVideo) return Promise.resolve();
+    return fetch(cfg.waterLoop).then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
       .then(blob => { waterVideo.src = URL.createObjectURL(blob); })
       .catch(() => { waterBlocked = true; });
+  }
+  if (waterVideo) {
+    Object.assign(waterVideo, { muted: true, playsInline: true, preload: 'auto', loop: true });
+    if (frameCallbacks) {
+      const onWaterFrame = (at) => { waterFresh = true; waterCallbackAt = at; wake(); waterVideo.requestVideoFrameCallback(onWaterFrame); };
+      waterVideo.requestVideoFrameCallback(onWaterFrame);
+    }
+    waterVideo.addEventListener('loadeddata', () => wake());
     document.addEventListener('visibilitychange', () => { if (document.hidden) waterVideo.pause(); });
-    addEventListener('pointerdown', () => { waterBlocked = false; }, { passive: true });
+    addEventListener('pointerdown', () => { waterBlocked = false; wake(); }, { passive: true });
   }
 
   let rect = [0, 0, 1, 1];
@@ -554,6 +608,7 @@
     if (ux < 0 || ux > 1 || uy < 0 || uy > 1) { pAmt = 0; return; }
     pAmt = Math.min(1, 0.2 + (dist / (dt / 1000)) * 0.5);
     LIGHTS.forEach((L, i) => { if (Math.hypot((ux - L[0]) * ASPECT, uy - L[1]) < 0.04 * (L[2] || 1) + 0.012) litUntil[i] = now + 5000; });
+    wake();
   }, { passive: true });
 
   // Shooting stars at night, every 15-30 s at random.
@@ -564,13 +619,20 @@
   let reveal = 1;
   window.livingPaperBloom = () => {
     bloomStart = performance.now(); bloomExit = -1; bloomScrollY = scrollY;
-    reveal = 0; intro = 0; update();
+    reveal = 0; intro = 0; update(); wake();
   };
 
   let lastClip = -1;
   let lastFrame = performance.now();
   const start = performance.now();
+  // Each wet pass lowers every wet texel by at least one of the texture's 255 steps (its fixed 0.002 drying
+  // alone is more than half a step), so 255 passes after the last drop the paper is dry everywhere and the
+  // pass, which would only copy zeros, is skipped. A few spare passes for safety.
+  const WET_PASSES = 260;
+  let wetPasses = WET_PASSES;
+  const frames = { busy: 0, rest: 0 };   // how many frames were drawn at full rate and at rest (livingPaperState)
   function frame(now) {
+    pending = 0;
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     lastFrame = now;
     // Absorb discrete wheel events without seeking the independently playing
@@ -600,20 +662,26 @@
       if (nextIntro !== intro) { intro = nextIntro; update(); }
       if (reveal >= 1) { bloomStart = -1; reveal = 1; }
     }
-    // Wet map: dry a little, add the cursor's drop.
-    gl.useProgram(wetProg);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, wetFbo[1 - wetRead]);
-    gl.viewport(0, 0, WET_W, WET_H);
-    gl.activeTexture(gl.TEXTURE5);
-    gl.bindTexture(gl.TEXTURE_2D, wetTex[wetRead]);
-    gl.uniform1f(uw.decay, Math.exp(-dt / 4.0));
-    gl.uniform2f(uw.at, px, py);
-    gl.uniform1f(uw.amount, pAmt * 0.55 * motion.wet);
+    // Wet map: dry a little, add the cursor's drop (only while any of the paper is wet or a drop falls).
+    const drop = pAmt * 0.55 * motion.wet;
     pAmt = 0;
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    wetRead = 1 - wetRead;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
+    if (drop > 0) wetPasses = 0;
+    if (wetPasses < WET_PASSES) {
+      wetPasses++;
+      const decay = Math.exp(-dt / 4.0);
+      gl.useProgram(wetProg);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, wetFbo[1 - wetRead]);
+      gl.viewport(0, 0, WET_W, WET_H);
+      gl.activeTexture(gl.TEXTURE5);
+      gl.bindTexture(gl.TEXTURE_2D, wetTex[wetRead]);
+      gl.uniform1f(uw.decay, decay);
+      gl.uniform2f(uw.at, px, py);
+      gl.uniform1f(uw.amount, drop);
+      gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+      wetRead = 1 - wetRead;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+    }
     gl.useProgram(prog);
     gl.activeTexture(gl.TEXTURE5);
     gl.bindTexture(gl.TEXTURE_2D, wetTex[wetRead]);
@@ -654,8 +722,13 @@
         waterPending = true;
         waterVideo.play().catch(() => { waterBlocked = true; }).finally(() => { waterPending = false; });
       }
-      if (waterVideo.readyState >= 2 && waterTime !== waterVideo.currentTime) {
+      // With frame callbacks, upload only a newly presented frame; if they stop arriving, fall back to
+      // uploading whenever the playback time has moved.
+      const moved = waterTime !== waterVideo.currentTime;
+      const callbacksWork = frameCallbacks && now - waterCallbackAt < 500;
+      if (waterVideo.readyState >= 2 && (!waterHasFrame || waterFresh || (moved && !callbacksWork))) {
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, waterVideo);
+        waterFresh = false;
         waterTime = waterVideo.currentTime;
         if (!waterHasFrame) waterReadyAt = now;
         waterHasFrame = true;
@@ -686,14 +759,22 @@
     gl.uniform1f(u.meteorT, meteorStart < 0 ? -1 : (now - meteorStart) / 1000);
     gl.uniform1f(u.meteorSeed, meteorSeed);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    // The ink-drop cursor changes shape in this same frame (cursor.js).
+    if (window.livingPaperAfterFrame) window.livingPaperAfterFrame(now);
     if (window.livingPaperFrame) window.livingPaperFrame(performance.now() - now);
-    requestAnimationFrame(frame);
+    const busy = bloomStart >= 0 || renderLight !== current.light || wetPasses < WET_PASSES || nLit > 0
+      || (meteorStart >= 0 && now - meteorStart < 3400 && s.light > 1.4)
+      || (waterHasFrame && waterWeight < 1 && !waterBlocked);
+    frames[busy ? 'busy' : 'rest']++;
+    if (busy) pending = requestAnimationFrame(frame);
+    // At rest: the water video's next frame wakes the page; this timer is only the fallback.
+    else rest(waterVideo && !waterVideo.paused && frameCallbacks ? 1000 / 16 : 1000 / REST_FPS);
   }
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('living paper: WebGL context lost', e); });
   canvas.addEventListener('webglcontextrestored', () => { console.warn('living paper: WebGL context restored; reload the page to rebuild'); });
 
-  window.livingPaperState = () => ({ current, rendered, reveal, intro, water: waterVideo ? { ready: waterHasFrame, time: waterVideo.currentTime, paused: waterVideo.paused, weight: waterWeight, seeking: waterVideo.seeking } : null, clips: clips.map(c => (c ? { ready: c.ready, time: c.video.currentTime, wanted: c.wanted, readyState: c.video.readyState, seeking: c.video.seeking } : null)) });
-  window.livingPaperMotion = (changes) => { Object.assign(motion, changes); applyMotion(); return { ...motion }; };
+  window.livingPaperState = () => ({ current, rendered, reveal, intro, frames: { ...frames }, water: waterVideo ? { ready: waterHasFrame, time: waterVideo.currentTime, paused: waterVideo.paused, weight: waterWeight, seeking: waterVideo.seeking } : null, clips: clips.map(c => (c ? { ready: c.ready, time: c.video.currentTime, wanted: c.wanted, readyState: c.video.readyState, seeking: c.video.seeking } : null)) });
+  window.livingPaperMotion = (changes) => { Object.assign(motion, changes); applyMotion(); wake(); return { ...motion }; };
 
   gl.activeTexture(gl.TEXTURE2);
   const ready = [loadImage(cfg.mask, maskTex)];
@@ -705,8 +786,9 @@
     })
     : loadImage(cfg.sky, skyTex));
   cfg.stills.forEach((src, i) => ready.push(loadImage(src, stillTex[i])));
-  addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', layout);
+  addEventListener('scroll', () => { update(); wake(); }, { passive: true });
+  // A resize clears the canvas: draw again at once.
+  addEventListener('resize', () => { layout(); wake(); });
   layout();
   landOnHash();
   // If the paintings take a moment, say so where the scroll hint sits.
@@ -725,7 +807,10 @@
     if (BLOOM > 0 && !location.hash && scrollY < 2 && document.documentElement.classList.contains('lp-opening')) window.livingPaperBloom();
     document.body.classList.add('lp-live');
     document.documentElement.classList.remove('lp-opening');
-    requestAnimationFrame(frame);
+    running = true;
+    wake();
+    // Then the water, then the two scroll clips, so neither competes with the paintings for the first view.
+    loadWater().then(loadClips);
   });
 
   // ?tune: sliders for the amounts, on the real page. Juan sends the numbers; they go into LIVING_PAPER.motion.
