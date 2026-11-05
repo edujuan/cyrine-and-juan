@@ -2,7 +2,8 @@
 // between neighbouring lights; while you rest on a scene, small things move on their own (water, pines,
 // a shooting star at night), written in a WebGL shader over the still. The painting arrives as a watercolour
 // bloom, its edges breathe like a wash still drying, and under the cursor the pigment loosens as if the paper
-// were wet again. Configured by window.LIVING_PAPER.
+// were wet again. Configured by window.LIVING_PAPER. At rest it draws only when the water video has a new
+// frame (see "Frame pacing" below), so an open tab stays cool.
 (function livingPaper() {
   const cfg = window.LIVING_PAPER;
   const n = cfg.stills.length;
