@@ -5,7 +5,13 @@
 // were wet again. Configured by window.LIVING_PAPER. At rest it draws only when the water video has a new
 // frame (see "Frame pacing" below), so an open tab stays cool.
 (function livingPaper() {
-  const cfg = window.LIVING_PAPER;
+  // Upright phones get their own painting, composed for a tall screen (LIVING_PAPER.phone): it fills the
+  // whole screen, edge to edge, and its settings replace the desktop ones. Turning the phone across the
+  // threshold reloads the page, so each set only ever loads its own paintings.
+  const base = window.LIVING_PAPER;
+  const PHONE_MAX = base.phone ? (base.phone.maxAspect || 0.8) : 0;
+  const phone = !!base.phone && innerWidth / innerHeight < PHONE_MAX;
+  const cfg = phone ? Object.assign({}, base, base.phone) : base;
   const n = cfg.stills.length;
   // Screens of scroll resting on each scene (a number, or one per scene) and per time-lapse.
   const RESTS = Array.isArray(cfg.rest) ? cfg.rest : Array(n).fill(cfg.rest || 0.9);
@@ -16,7 +22,7 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   // Motion amounts (Juan tunes these): the living motion, plus the breath of the edge, the drying rim, the
   // wet paper under the cursor and while the light changes.
-  const motion = Object.assign({ water: 1, ripples: 1, sparkle: 1, speed: 1, trees: 0.5, gust: 0.5, breath: 1, breathPeriod: 8, rim: 0.5, wet: 1, wetChange: 0.5, dry: 0.15, wetTint: 0.5, lightUp: 1, stars: 1 }, cfg.motion);
+  const motion = Object.assign({ water: 1, ripples: 1, sparkle: 1, speed: 1, trees: 0.5, gust: 0.5, breath: 1, breathPeriod: 8, rim: 0.5, wet: 1, wetChange: 0.5, dry: 0.15, wetTint: 0.5, lightUp: 1, stars: 1, gulls: 1 }, cfg.motion);
   // Only a fine pointer can wet the paper, so only then does the resting painting sit a little dry.
   if (!matchMedia('(hover: hover) and (pointer: fine)').matches) motion.dry = 0;
   let BLOOM = cfg.bloom == null ? 6.5 : cfg.bloom;     // seconds the painting takes to bloom in
@@ -53,14 +59,61 @@
   let vh = innerHeight;
   let band = false;
   function layout() {
+    if (base.phone && (innerWidth / innerHeight < PHONE_MAX) !== phone) { location.reload(); return; }
     vh = innerHeight;
-    band = innerWidth / innerHeight < 1.15;
-    document.body.classList.toggle('lp-band', band);
+    band = phone || innerWidth / innerHeight < 1.15;
+    document.body.classList.toggle('lp-band', band && !phone);
+    document.body.classList.toggle('lp-phone', phone);
     track.style.height = `${(TOTAL + 1) * vh}px`;
     anchors.forEach((a, i) => { a.style.top = `${(STARTS[i] + (i ? RESTS[i] * 0.4 : 0)) * vh}px`; });
     if (gl) resize();
+    if (phone) { measureWash(); washPx = washTarget.slice(); }
     update();
   }
+  // Phones: how high the paper has to reach under each scene's words. Only an unfolded list needs it (from its
+  // Close button down); the RSVP button and the folded lists' buttons are solid and stand on the painting, so
+  // there the paper covers just the chapter strip.
+  function measureWash() {
+    washTarget = copies.map((copy) => {
+      const top = copy.classList.contains('is-open') && copy.querySelector('.lp-more');
+      return top ? Math.max(44, vh - top.getBoundingClientRect().top + 4) : 44;
+    });
+  }
+  function tweenWash() {
+    let moving = false;
+    washPx = washTarget.map((to, i) => {
+      const from = washPx[i] == null ? to : washPx[i];
+      if (Math.abs(to - from) < 0.5) return to;
+      moving = true;
+      return from + (to - from) * 0.16;
+    });
+    update();
+    if (moving) requestAnimationFrame(tweenWash);
+  }
+  // Phones: the lists stay folded so the painting leads. A tap unfolds one; it folds again half a minute after
+  // the last touch, or when its scene leaves.
+  const FOLD_MS = 30000, foldTimers = [];
+  function setFold(i, open) {
+    const copy = copies[i], button = copy.querySelector('.lp-more');
+    if (!button || copy.classList.contains('is-open') === open) return;
+    copy.classList.toggle('is-open', open);
+    button.setAttribute('aria-expanded', String(open));
+    button.firstChild.textContent = open ? button.dataset.open : button.dataset.closed;
+    clearTimeout(foldTimers[i]);
+    if (open) foldTimers[i] = setTimeout(() => setFold(i, false), FOLD_MS);
+    measureWash();
+    tweenWash();
+  }
+  if (phone) copies.forEach((copy, i) => {
+    const button = copy.querySelector('.lp-more');
+    if (!button) return;
+    button.addEventListener('click', () => setFold(i, !copy.classList.contains('is-open')));
+    copy.addEventListener('pointerdown', () => {
+      if (!copy.classList.contains('is-open')) return;
+      clearTimeout(foldTimers[i]);
+      foldTimers[i] = setTimeout(() => setFold(i, false), FOLD_MS);
+    });
+  });
   // Where the scroll is: the light value (0..n-1), and for a transition its clip and progress.
   function state() {
     const y = scrollY / vh;
@@ -85,9 +138,25 @@
 
   let current = state();
   let rendered = current, renderLight = current.light;
+  // Which paintings are in. Only the one the reader lands on holds up the first view (two in the middle of a
+  // light change); the others follow at once, and until one is in the light waits at the last one that is.
+  const stillIn = cfg.stills.map(() => false);
+  let landed = [0, 0];
+  function holdLight(light) {
+    let lo = landed[0], hi = landed[1];
+    while (lo > 0 && stillIn[lo - 1]) lo--;
+    while (hi < n - 1 && stillIn[hi + 1]) hi++;
+    return clamp(light, lo, hi);
+  }
   let intro = 1;   // 0..1 while the painting blooms in: the first scene's words come once the paint has run
+  const shown = [];
+  let washPx = [], washTarget = [];
   function update() {
     current = state();
+    if (stillIn.includes(false)) {
+      const held = holdLight(current.light);
+      if (held !== current.light) current = { light: held, scene: held, clip: -1, p: 0 };
+    }
     const y = scrollY / vh;
     copies.forEach((copy, i) => {
       const start = STARTS[i];
@@ -100,7 +169,16 @@
       copy.style.filter = o < 0.98 ? `blur(${((1 - o) * 2.2).toFixed(2)}px)` : '';
       copy.style.visibility = o < 0.02 ? 'hidden' : 'visible';
       copy.setAttribute('aria-hidden', String(o < 0.5));
+      shown[i] = o;
     });
+    // Phones: the paper wash from the bottom rises only as high as the scene's text needs.
+    if (phone) shown.forEach((o, i) => { if (o < 0.3 && copies[i].classList.contains('is-open')) setTimeout(() => setFold(i, false), 0); });
+    if (phone && washPx.length) {
+      // Between scenes, while no words show, the paper sinks back to the chapter strip.
+      let sum = 0, h = 0;
+      shown.forEach((o, i) => { sum += o; h += o * washPx[i]; });
+      document.body.style.setProperty('--wash', `${(sum > 1 ? h / sum : h + (1 - sum) * 44).toFixed(0)}px`);
+    }
     scenesNav.forEach((a, i) => {
       if (i === current.scene) a.setAttribute('aria-current', 'location');
       else a.removeAttribute('aria-current');
@@ -116,6 +194,11 @@
   // ---- WebGL
   const gl = !reduced && canvas.getContext('webgl', { premultipliedAlpha: false, antialias: false });
   if (!gl) {
+    // The plain stills take over: now the dusk and night ones are wanted too.
+    document.querySelectorAll('.lp-fallback [data-srcset], .lp-fallback [data-src]').forEach((el) => {
+      if (el.dataset.srcset) el.srcset = el.dataset.srcset;
+      if (el.dataset.src) el.src = el.dataset.src;
+    });
     document.documentElement.classList.remove('lp-opening');
     document.body.classList.add('lp-still');
     addEventListener('scroll', update, { passive: true });
@@ -132,7 +215,17 @@
     uniform vec4 rect, frame;
     uniform vec3 paper;
     uniform vec2 seed;
-    uniform float t, clipWeight, waterClipWeight, sceneMix, blend, light, aspect, meteorT, meteorSeed, reveal, bloomReach, wetAll, wide, screenAspect;
+    uniform float t, clipWeight, waterClipWeight, sceneMix, blend, light, aspect, meteorT, meteorSeed, reveal, bloomReach, wetAll, wide, screenAspect, bleed;
+    uniform vec2 waterBand;
+    // Procedural strokes are sized for the wide desktop painting; xs (this painting's aspect over that one's)
+    // keeps them the same shape on the tall phone painting. Exactly 1 on the desktop.
+    uniform float xs;
+    uniform float gulls;
+    uniform vec2 gullBand;
+    uniform vec4 gullAt[3], gullPose[3];
+    uniform float gullBehind, gullPx;
+    uniform vec4 meteorBox;
+    uniform vec3 meteorVanish;
     uniform float waterAtlas, waterStages;
     uniform vec2 waterGradeSize;
     uniform vec2 cut;
@@ -149,6 +242,13 @@
       vec2 inset = 0.5 / waterGradeSize;
       vec2 at = clamp(uv, inset, 1.0 - inset);
       return vec2(at.x, (at.y + stage) / waterStages);
+    }
+    // The painted gull at one size (level 0 = a 128 px cell, then 64, 32, 16), as ink density.
+    float gullTap(vec2 cu, float level) {
+      float size = 128.0 * exp2(-level);
+      vec2 at = clamp(cu, vec2(0.5 / size), vec2(1.0 - 0.5 / size));
+      vec2 px = vec2(at.x * size, 256.0 - 2.0 * size + at.y * size);
+      return (1.0 - texture2D(sky, vec2(px.x / waterGradeSize.x, (px.y / waterGradeSize.y + 1.0) / waterStages)).a) * 1.275;
     }
     float skyMask(vec2 uv) {
       if (waterAtlas > 0.5) return texture2D(sky, gradeUV(uv, 0.0)).a;
@@ -188,13 +288,14 @@
       // Off the sheet, or so far left of the cut that the painting's weight there is exactly 0: bare paper.
       if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0 || dx0 + slack <= -0.16) { gl_FragColor = vec4(paper, 1.0); return; }
       vec4 m = texture2D(mask, uv);
-      float near = clamp((uv.y - 0.595) / 0.33, 0.0, 1.0);
+      float near = clamp((uv.y - waterBand.x) / waterBand.y, 0.0, 1.0);
       float s = t * speed;
       float row = sqrt(near) * 46.0;
       // Water: sway and bob in bands, smaller far out.
-      float wave = sin(uv.y * 520.0 - s * 1.2 + sin(uv.x * 9.0 + s * 0.21) * 1.8) * 0.65 + sin(uv.y * 230.0 + s * 0.7 + uv.x * 3.0) * 0.35;
+      float ux = uv.x * xs;
+      float wave = sin(uv.y * 520.0 - s * 1.2 + sin(ux * 9.0 + s * 0.21) * 1.8) * 0.65 + sin(uv.y * 230.0 + s * 0.7 + ux * 3.0) * 0.35;
       float amp = water * m.r * (0.15 + 0.85 * near) * (1.0 - waterClipWeight);
-      vec2 d = vec2(wave * 0.0026 * amp, sin(uv.x * 40.0 + s * 0.9 + row) * 0.0007 * amp);
+      vec2 d = vec2(wave * 0.0026 * amp, sin(ux * 40.0 + s * 0.9 + row) * 0.0007 * amp);
       // Pines: bend from the rooted base, plus an irregular whiff of breeze.
       float whiff = pow(max(0.0, sin(t * 6.2831 / 13.0)), 10.0) + 0.7 * pow(max(0.0, sin(t * 6.2831 / 21.0 + 1.3)), 10.0);
       float lean = sin(t * 0.95) * 0.6 + sin(t * 0.53 + 1.0) * 0.4;
@@ -228,11 +329,11 @@
       // another moving wash over the independently playing water.
       float scrollWet = wetAll * (1.0 - m.r * waterClipWeight);
       float wraw = texture2D(wetMap, uv).r * wet;
-      if (scrollWet != 0.0) wraw += scrollWet * (0.3 + 0.7 * noise(uv * vec2(6.0, 4.0) + t * 0.05));
+      if (scrollWet != 0.0) wraw += scrollWet * (0.3 + 0.7 * noise(vec2(ux, uv.y) * vec2(6.0, 4.0) + t * 0.05));
       wraw = clamp(wraw, 0.0, 1.0);
       float w = 0.0;
       if (wraw > 0.0) {
-        float wn = noise(uv * vec2(26.0, 19.0) + 3.0) * 0.55 + noise(uv * vec2(80.0, 58.0) + 9.0) * 0.45;
+        float wn = noise(vec2(ux, uv.y) * vec2(26.0, 19.0) + 3.0) * 0.55 + noise(vec2(ux, uv.y) * vec2(80.0, 58.0) + 9.0) * 0.45;
         w = smoothstep(0.06, 0.45, wraw + (wn - 0.5) * 0.4 * smoothstep(0.0, 0.25, wraw));
       }
       float lum = dot(c, vec3(0.299, 0.587, 0.114));
@@ -248,15 +349,15 @@
       // Ink ripple strokes and sparkle on warm light (until the water video plays, which replaces them).
       if (m.r * (1.0 - waterClipWeight) != 0.0) {
         float sway = sin(s * 0.55 + floor(row) * 1.7) * 0.025 + s * 0.006;
-        float nz = noise(vec2((uv.x + sway) * (10.0 + 26.0 * (1.0 - near)), row));
+        float nz = noise(vec2((ux + sway) * (10.0 + 26.0 * (1.0 - near)), row));
         float line = smoothstep(0.60, 0.68, nz) * (1.0 - smoothstep(0.68, 0.76, nz));
-        float lit = noise(vec2((uv.x - sway * 0.8) * (8.0 + 20.0 * (1.0 - near)) + 13.0, row + 0.5));
+        float lit = noise(vec2((ux - sway * 0.8) * (8.0 + 20.0 * (1.0 - near)) + 13.0, row + 0.5));
         float glow = smoothstep(0.70, 0.76, lit) * (1.0 - smoothstep(0.76, 0.84, lit));
         float r = ripples * m.r * (0.35 + 0.65 * near) * (1.0 - waterClipWeight);
         c *= 1.0 - 0.22 * line * r;
         c = mix(c, vec3(0.97, 0.95, 0.90), 0.28 * glow * r);
         float warm = smoothstep(0.07, 0.17, c.r - c.b);
-        float sp = pow(noise(vec2(uv.x * 90.0 + s * 0.5, uv.y * 300.0 - s * 0.25)), 18.0) * 9.0;
+        float sp = pow(noise(vec2(ux * 90.0 + s * 0.5, uv.y * 300.0 - s * 0.25)), 18.0) * 9.0;
         c += vec3(1.0, 0.9, 0.7) * sp * warm * m.r * sparkle * 0.55 * (1.0 - waterClipWeight);
       }
       // Things that light up when the cursor passes: a lantern or a window comes on the way it is lit in the night
@@ -291,8 +392,8 @@
       float night = smoothstep(1.4, 1.9, light);
       if (meteorT >= 0.0 && meteorT < 3.4 && night > 0.0) {
         vec2 pp = vec2(uv.x * aspect, uv.y);
-        vec2 start = vec2(mix(0.62, 0.92, fract(meteorSeed * 3.7)) * aspect, mix(0.04, 0.17, fract(meteorSeed * 9.1)));
-        vec2 vanish = vec2(mix(0.40, 0.55, fract(meteorSeed * 5.3)) * aspect, 0.57);
+        vec2 start = vec2(mix(meteorBox.x, meteorBox.y, fract(meteorSeed * 3.7)) * aspect, mix(meteorBox.z, meteorBox.w, fract(meteorSeed * 9.1)));
+        vec2 vanish = vec2(mix(meteorVanish.x, meteorVanish.y, fract(meteorSeed * 5.3)) * aspect, meteorVanish.z);
         vec2 dir = normalize(vanish - start);
         float prog = clamp(meteorT / 3.2, 0.0, 1.0);
         float k = 1.0 - pow(1.0 - prog, 2.5);
@@ -321,7 +422,7 @@
                              min(dot(paint(q + vec2(0.0, o.y), uv), vec3(0.299, 0.587, 0.114)), dot(paint(q - vec2(0.0, o.y), uv), vec3(0.299, 0.587, 0.114))));
           float star = smoothstep(0.45, 0.8, lumS) * (1.0 - smoothstep(0.22, 0.42, around));
           c += vec3(1.0, 0.96, 0.85) * star * nearC * 0.7;
-          vec2 g = uv * vec2(140.0, 100.0);
+          vec2 g = vec2(ux, uv.y) * vec2(140.0, 100.0);
           vec2 cell = floor(g), f = fract(g);
           float h1 = hash(cell + 3.0), h2 = hash(cell + 7.0), h3 = hash(cell + 11.0);
           float dd = length((f - vec2(0.2 + 0.6 * h1, 0.2 + 0.6 * h2)) * vec2(1.27, 1.0));
@@ -329,10 +430,43 @@
           c += vec3(1.0, 0.95, 0.8) * newStar * nearC * (1.0 - smoothstep(0.3, 0.5, lumS)) * 0.9;
         }
       }
+      // Seagulls at sunset: three, painted by hand in the site's ink and seen from behind (built from the study
+      // in assets/images/gulls/gull-poses.jpg; the gull rides in the alpha of the atlas's second panel, see
+      // scripts/gull_sprites.py). Where each one is, how large, how it banks and where its wingbeat stands are
+      // worked out in metres and seconds outside the shader (flyGulls below); here it is only drawn. The wings
+      // bend at the shoulders, tips trailing, so a wingbeat has no steps in it. The ink is glazed over the wash
+      // (multiplied), and past gullBehind the gull passes behind whatever stands in front of the sky (the pine
+      // it comes out of, the village).
+      float day = 1.0 - smoothstep(0.1, 0.8, light);
+      if (gulls > 0.0 && waterAtlas > 0.5 && day > 0.0 && uv.y > gullBand.x && uv.y < gullBand.y) {
+        vec2 pg = vec2(uv.x * aspect, uv.y);
+        float ink = 0.0;
+        for (int i = 0; i < 3; i++) {
+          vec4 at = gullAt[i], pose = gullPose[i];      // place (x, y), half its cell, ink; bank, wingspan seen, beat, phase
+          if (at.w <= 0.0) continue;
+          vec2 dg = (pg - at.xy) / at.z;
+          if (abs(dg.x) > 1.5 || abs(dg.y) > 1.5) continue;
+          dg = vec2(dg.x * cos(pose.x) + dg.y * sin(pose.x), dg.y * cos(pose.x) - dg.x * sin(pose.x));
+          dg.x /= pose.y;
+          if (abs(dg.x) > 1.0 || abs(dg.y) > 1.0) continue;
+          // The wingbeat: each wing turns about the shoulder, more the further out, the tip half a beat behind;
+          // gliding, the wings are held a little high.
+          vec2 fromBody = dg * 0.5;
+          float reach = abs(fromBody.x);
+          float lift = (0.62 * pose.z * sin(6.2832 * (pose.w - 0.5 * reach)) + 0.1 * (1.0 - pose.z)) * smoothstep(0.03, 0.16, reach);
+          vec2 cu = 0.5 + vec2((fromBody.x < 0.0 ? -1.0 : 1.0) * max(reach * cos(lift) - fromBody.y * sin(lift), 0.0), reach * sin(lift) + fromBody.y * cos(lift));
+          if (cu.y < 0.0 || cu.y > 1.0 || cu.x < 0.0 || cu.x > 1.0) continue;
+          float lod = clamp(log2(128.0 / max(2.0 * at.z * gullPx, 1.0)), 0.0, 3.0);
+          float l0 = floor(lod);
+          ink = max(ink, at.w * mix(gullTap(cu, l0), gullTap(cu, min(l0 + 1.0, 3.0)), lod - l0));
+        }
+        if (ink > 0.0) c *= mix(vec3(1.0), vec3(0.10, 0.17, 0.27), min(1.0, ink) * min(1.0, gulls) * day * (uv.x > gullBehind ? skyMask(uv) : 1.0));
+      }
       // Outside the painting is bare paper; its own watercolour edges melt into it.
       vec2 inside = step(vec2(0.0), uv) * step(uv, vec2(1.0));
       // Distance to the nearest border in painting-height units, so the ragged band is as wide on every side.
-      float edge = wide > 0.5 ? uv.x * aspect : min(min(uv.x, 1.0 - uv.x) * aspect, min(uv.y, 1.0 - uv.y));
+      // The phone painting is full bleed: it carries its own washes and meets every screen edge, so no ragged edge.
+      float edge = bleed > 0.5 ? 1.0 : wide > 0.5 ? uv.x * aspect : min(min(uv.x, 1.0 - uv.x) * aspect, min(uv.y, 1.0 - uv.y));
       float sheet = inside.x * inside.y;
       // Away from every border (edge >= 0.146 > reach + 0.045) and well right of the cut, the sheet is exactly 1
       // and both rims exactly 0, so the ragged edge's noise is only computed near them.
@@ -413,15 +547,90 @@
   gl.useProgram(prog);
   const u = {};
   ['still', 'stillB', 'clip', 'mask', 'sky', 'wetMap', 'waterLoop', 'waterAtlas', 'waterStages', 'waterGradeSize', 'rect', 'frame', 'paper', 'seed', 'cut', 't', 'clipWeight', 'waterClipWeight', 'sceneMix', 'blend', 'light', 'aspect', 'meteorT', 'meteorSeed', 'reveal', 'bloomReach', 'wetAll', 'wide', 'screenAspect',
+    'bleed', 'xs', 'gulls', 'gullAt', 'gullPose', 'gullBand', 'gullBehind', 'gullPx', 'waterBand', 'meteorBox', 'meteorVanish',
     'water', 'ripples', 'sparkle', 'speed', 'trees', 'gust', 'breath', 'breathPeriod', 'rim', 'wet', 'dry', 'wetTint', 'lightUp', 'lights', 'night', 'stars', 'nLit']
     .forEach(name => { u[name] = gl.getUniformLocation(prog, name); });
   [['still', 0], ['clip', 1], ['mask', 2], ['sky', 3], ['stillB', 4], ['wetMap', 5], ['night', 6], ['waterLoop', 7]].forEach(([name, unit]) => gl.uniform1i(u[name], unit));
   gl.uniform1f(u.aspect, ASPECT);
+  gl.uniform1f(u.xs, ASPECT / (2400 / 1348));
+  // ---- The seagulls' flight, in metres and seconds, so that their size and speed are what a gull's would be
+  // at that place in the painting. The painting gives the scale: a door or a storey next to the pine measures
+  // how many pixels a metre is there, and with the painting's angle of view that puts the pine at `distance`
+  // metres from us (`focal` is the distance at which one painting height spans one metre per metre, `eye` the
+  // point straight ahead: the middle of the painting on the sea horizon). The gull is a yellow-legged gull:
+  // 1.35 m from wingtip to wingtip, cruising at 11 m/s with three wingbeats a second, and circling at 9 m/s banked
+  // 25 degrees, which makes its circle 17.7 m in radius and 12.4 s round (r = v^2 / (g tan bank)).
+  // Each one's flight: out of the pine (`tree`) and straight away from us toward the far point `away` (where
+  // its line would meet the horizon, like rails meeting); `circleAt` metres from us it wheels twice, rising with
+  // the warm air and drifting on; then it carries on, smaller with every metre, and is gone between the two
+  // `gone` distances, where it is too small to see. It never comes back toward us. `magnify` draws it larger
+  // than life (1 = true size); past `behind` (x) it goes behind whatever the sky mask hides.
+  const GULLS = Object.assign({ tree: [0.655, 0.3], away: [0.5, 0.53], eye: [0.5, 0.595], focal: 1.4, distance: 52, circleAt: 190,
+    gone: [330, 520], magnify: 1.6, behind: 0.56 }, cfg.gulls);
+  const GULL = { span: 1.35, cruise: 11, soar: 9, bank: 25 * Math.PI / 180, drift: 2.5, climb: 1.5, loops: 2, beat: 3 };
+  GULL.radius = GULL.soar * GULL.soar / (9.81 * Math.tan(GULL.bank));
+  GULL.turn = GULL.soar / GULL.radius;   // radians a second
+  const gullAt = new Float32Array(12), gullPose = new Float32Array(12), gullBand = [0, 0];
+  // How fast the quickest gull in sight moves (its body, plus its wingtips while it beats), in painting heights
+  // a second: the page draws only as many frames as that needs (see "Frame pacing").
+  let gullHurry = 0, gullClock = -1;
+  const gullWas = new Float32Array(6);
+  // Seconds spent past the start of a smooth step from a to b: the integral of smooth(a, b, x).
+  const smoothSince = (a, b, x) => { const k = clamp((x - a) / (b - a)); return x >= b ? x - (a + b) / 2 : (b - a) * (k * k * k - k * k * k * k / 2); };
+  const gullChance = (i, nth, k) => { const x = Math.sin(i * 127.1 + nth * 311.7 + k * 74.7) * 43758.5453; return x - Math.floor(x); };
+  function flyGulls(t) {
+    const f = GULLS.focal, ex = GULLS.eye[0] * ASPECT, ey = GULLS.eye[1], far = GULLS.distance;
+    // Metres to the right of straight ahead, above the eye, and away from us.
+    const heading = [(GULLS.away[0] * ASPECT - ex) / f, (ey - GULLS.away[1]) / f, 1];
+    const len = Math.hypot(...heading);
+    const dir = heading.map(v => v / len);
+    const tree = [(GULLS.tree[0] * ASPECT - ex) / f * far, (ey - GULLS.tree[1]) / f * far, far];
+    const out = Math.max(3, (GULLS.circleAt - far) / (GULL.cruise * dir[2])), round = GULL.loops * 2 * Math.PI / GULL.turn;
+    gullBand[0] = 1; gullBand[1] = 0;
+    const dt = t - gullClock;
+    let hurry = 0;
+    for (let i = 0; i < 3; i++) {
+      const whole = out + round + 30 + 4 * i;
+      const life = t / whole + 0.37 * i + 0.1, nth = Math.floor(life), since = (life - nth) * whole;
+      const spin = (i + nth) % 2 ? -1 : 1;
+      const turning = smooth(out - 2, out + 2, since) * (1 - smooth(out + round - 2, out + round + 2, since));
+      const circled = smoothSince(out - 2, out + 2, since) - smoothSince(out + round - 2, out + round + 2, since);
+      const flown = GULL.cruise * since - (GULL.cruise - GULL.drift) * circled;
+      const th = spin * GULL.turn * (since - out) + 2 * Math.PI * gullChance(i, nth, 1);
+      const x = tree[0] + 6 * (gullChance(i, nth, 2) - 0.5) + dir[0] * flown + GULL.radius * turning * Math.cos(th);
+      const y = tree[1] + dir[1] * flown + GULL.climb * circled;
+      const z = tree[2] + dir[2] * flown + GULL.radius * turning * Math.sin(th);
+      // The painted gull's wingspan fills 0.73 of its cell.
+      const half = GULLS.magnify * f * GULL.span / z / (2 * 0.73);
+      const px = ex + f * x / z, py = ey - f * y / z;
+      const across = Math.cos(th);   // 1 or -1 flying straight away from us or toward us, 0 crossing
+      const beating = Math.max(1 - smooth(4, 8, since), (1 - turning * 0.8) * smooth(-0.2, 0.4, Math.sin(t * 0.45 + i * 2.3 + nth * 1.7)));
+      gullAt.set([px, py, half, smooth(0, 1.2, since) * (1 - smooth(GULLS.gone[0], GULLS.gone[1], z))], i * 4);
+      gullPose.set([-GULL.bank * spin * across * turning + 0.05 * Math.sin(t * 0.5 + i * 1.9), 1 - 0.4 * turning * (1 - across * across),
+        beating, (t * GULL.beat * (0.95 + 0.1 * gullChance(i, nth, 3)) + 0.37 * i) % 1], i * 4);
+      if (gullAt[i * 4 + 3] > 0) {
+        gullBand[0] = Math.min(gullBand[0], py - 1.5 * half); gullBand[1] = Math.max(gullBand[1], py + 1.5 * half);
+        // A wingtip sits 0.73 of the half cell from the body and swings 0.62 radians either way, GULL.beat times a second.
+        if (dt > 0 && dt < 0.5) hurry = Math.max(hurry, Math.hypot(px - gullWas[i * 2], py - gullWas[i * 2 + 1]) / dt + beating * half * 0.73 * 0.62 * 4 * GULL.beat);
+      }
+      gullWas[i * 2] = px; gullWas[i * 2 + 1] = py;
+    }
+    if (dt > 0 && dt < 0.5) gullHurry = hurry;
+    gullClock = t;
+  }
+  gl.uniform1f(u.gullBehind, GULLS.behind);
   gl.uniform1f(u.waterStages, n);
   gl.uniform2f(u.waterGradeSize, 1, 1);
   gl.uniform2f(u.seed, SEED[0], SEED[1]);
   gl.uniform2f(u.cut, CUT[0], CUT[1]);
-  const TUNABLE = ['water', 'ripples', 'sparkle', 'speed', 'trees', 'gust', 'breath', 'breathPeriod', 'rim', 'wet', 'dry', 'wetTint', 'lightUp', 'stars'];
+  // Where the water starts and how deep it runs, and where shooting stars start and vanish (painting coordinates).
+  const WATER_BAND = cfg.waterBand || [0.595, 0.33];
+  const METEOR = Object.assign({ start: [0.62, 0.92, 0.04, 0.17], vanish: [0.40, 0.55, 0.57] }, cfg.meteor);
+  gl.uniform2f(u.waterBand, WATER_BAND[0], WATER_BAND[1]);
+  gl.uniform4f(u.meteorBox, ...METEOR.start);
+  gl.uniform3f(u.meteorVanish, ...METEOR.vanish);
+  gl.uniform1f(u.bleed, phone ? 1 : 0);
+  const TUNABLE = ['water', 'ripples', 'sparkle', 'speed', 'trees', 'gust', 'breath', 'breathPeriod', 'rim', 'wet', 'dry', 'wetTint', 'lightUp', 'stars', 'gulls'];
   function applyMotion() { gl.useProgram(prog); TUNABLE.forEach(name => gl.uniform1f(u[name], motion[name])); }
   applyMotion();
   const uw = {};
@@ -479,12 +688,12 @@
   let wetRead = 0;
 
   // ---- Frame pacing. While something answers the reader (scrolling, the cursor and the paper it wets, lit
-  // lanterns, the bloom, a shooting star), every screen refresh is drawn. At rest the only motion left is
-  // slow (the water video at 24 frames a second, the pines, the breathing edge), so the page draws when the
-  // water has a new frame, or 24 times a second without it, instead of 120 times a second on a ProMotion
-  // screen. Nothing is drawn while the tab is hidden.
+  // lanterns, the bloom, a shooting star) or flies fast across the sky (a gull close by), every screen refresh is
+  // drawn. At rest the only motion left is slow (the water video at 24 frames a second, the pines, the
+  // breathing edge), so the page draws when the water has a new frame, or 24 times a second without it,
+  // instead of 120 times a second on a ProMotion screen. Nothing is drawn while the tab is hidden.
   const REST_FPS = 24;
-  let pending = 0, sleepTimer = 0, running = false;
+  let pending = 0, sleepTimer = 0, running = false, gullPace = false, gullFps = 0;
   function wake() {
     if (!running || document.hidden) return;
     if (sleepTimer) { clearTimeout(sleepTimer); sleepTimer = 0; }
@@ -559,7 +768,13 @@
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
-    if (band) {
+    if (phone) {
+      // Upright phones: the tall painting covers the whole screen, cropped around cfg.focus where the screen differs.
+      hang = [0, 0, 1, 1];
+      const view = w / h, F = cfg.focus || [0.5, 0.5];
+      if (view > ASPECT) { const f = ASPECT / view; rect = [0, F[1] * (1 - f), 1, f]; }
+      else { const f = view / ASPECT; rect = [F[0] * (1 - f), 0, f, 1]; }
+    } else if (band) {
       // Phones: the painting fills the band, cropped around the subject.
       hang = [0, 0, 1, 1];
       const view = w / h;
@@ -599,7 +814,13 @@
 
   // The cursor (or a finger) wets the paper where it passes over the painting; a quick pass leaves more.
   let px = -1, py = -1, pAmt = 0, lastPointer = 0;
-  addEventListener('pointermove', (e) => {
+  // On a phone the finger that scrolls is the brush: touches report their position while the page scrolls
+  // (pointer events stop as soon as a scroll starts), and a tap lights the lantern or window under it.
+  const touchAt = (e) => { const t = e.touches && e.touches[0]; if (t) brush({ clientX: t.clientX, clientY: t.clientY }); };
+  addEventListener('touchstart', touchAt, { passive: true });
+  addEventListener('touchmove', touchAt, { passive: true });
+  addEventListener('pointermove', (e) => brush(e), { passive: true });
+  function brush(e) {
     const [ux, uy] = toUV(e);
     const now = performance.now();
     const dt = Math.max(8, now - lastPointer);
@@ -610,7 +831,7 @@
     pAmt = Math.min(1, 0.2 + (dist / (dt / 1000)) * 0.5);
     LIGHTS.forEach((L, i) => { if (Math.hypot((ux - L[0]) * ASPECT, uy - L[1]) < 0.04 * (L[2] || 1) + 0.012) litUntil[i] = now + 5000; });
     wake();
-  }, { passive: true });
+  }
 
   // Shooting stars at night, every 15-30 s at random.
   let meteorStart = -1, meteorSeed = 0, nextMeteor = performance.now() + 4000;
@@ -634,6 +855,8 @@
   const frames = { busy: 0, rest: 0 };   // how many frames were drawn at full rate and at rest (livingPaperState)
   function frame(now) {
     pending = 0;
+    // The gulls alone are drawn only as often as their movement needs (see gullPace below).
+    if (gullPace && now - lastFrame < 1000 / gullFps - 4) { pending = requestAnimationFrame(frame); return; }
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     lastFrame = now;
     // Absorb discrete wheel events without seeking the independently playing
@@ -740,9 +963,16 @@
     gl.uniform1f(u.sceneMix, s.light - base);
     gl.uniform4f(u.rect, rect[0], rect[1], rect[2], rect[3]);
     gl.uniform4f(u.frame, hang[0], hang[1], hang[2], hang[3]);
+    gl.uniform1f(u.gullPx, canvas.height * hang[3] / rect[3]);
     const pa = cfg.paper[Math.min(n - 1, Math.floor(s.light))], pb = cfg.paper[Math.min(n - 1, Math.floor(s.light) + 1)], pk = s.light % 1;
     gl.uniform3f(u.paper, ...pa.map((v, i) => (v + (pb[i] - v) * pk) / 255));
-    gl.uniform1f(u.t, (now - start) / 1000);
+    // window.livingPaperClock (seconds) holds the painting's own clock still, to capture a chosen moment.
+    const clock = window.livingPaperClock != null ? window.livingPaperClock : (now - start) / 1000;
+    gl.uniform1f(u.t, clock);
+    if (motion.gulls > 0 && s.light < 0.8) {
+      flyGulls(clock);
+      gl.uniform4fv(u.gullAt, gullAt); gl.uniform4fv(u.gullPose, gullPose); gl.uniform2f(u.gullBand, gullBand[0], gullBand[1]);
+    }
     gl.uniform1f(u.clipWeight, weight);
     gl.uniform1f(u.blend, blend);
     gl.uniform1f(u.light, s.light);
@@ -766,15 +996,20 @@
     const busy = bloomStart >= 0 || renderLight !== current.light || wetPasses < WET_PASSES || nLit > 0
       || (meteorStart >= 0 && now - meteorStart < 3400 && s.light > 1.4)
       || (waterHasFrame && waterWeight < 1 && !waterBlocked);
-    frames[busy ? 'busy' : 'rest']++;
-    if (busy) pending = requestAnimationFrame(frame);
+    // Gulls in flight: a frame for every pixel and a half the quickest one moves, 60 a second at most. Small
+    // and far away (as on the phone) that is no more than the water's own pace, and nothing extra is drawn;
+    // only a gull close by, just out of the tree, asks for every refresh.
+    gullFps = motion.gulls > 0 && waterAtlasReady && s.light < 0.8 ? Math.min(60, gullHurry * canvas.clientHeight * hang[3] / rect[3] / 1.5) : 0;
+    gullPace = !busy && gullFps > 26;
+    frames[busy || gullPace ? 'busy' : 'rest']++;
+    if (busy || gullPace) pending = requestAnimationFrame(frame);
     // At rest: the water video's next frame wakes the page; this timer is only the fallback.
     else rest(waterVideo && !waterVideo.paused && frameCallbacks ? 1000 / 16 : 1000 / REST_FPS);
   }
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('living paper: WebGL context lost', e); });
   canvas.addEventListener('webglcontextrestored', () => { console.warn('living paper: WebGL context restored; reload the page to rebuild'); });
 
-  window.livingPaperState = () => ({ current, rendered, reveal, intro, frames: { ...frames }, water: waterVideo ? { ready: waterHasFrame, time: waterVideo.currentTime, paused: waterVideo.paused, weight: waterWeight, seeking: waterVideo.seeking } : null, clips: clips.map(c => (c ? { ready: c.ready, time: c.video.currentTime, wanted: c.wanted, readyState: c.video.readyState, seeking: c.video.seeking } : null)) });
+  window.livingPaperState = () => ({ current, rendered, reveal, intro, frames: { ...frames }, gullFps, stillIn: [...stillIn], water: waterVideo ? { ready: waterHasFrame, time: waterVideo.currentTime, paused: waterVideo.paused, weight: waterWeight, seeking: waterVideo.seeking } : null, clips: clips.map(c => (c ? { ready: c.ready, time: c.video.currentTime, wanted: c.wanted, readyState: c.video.readyState, seeking: c.video.seeking } : null)) });
   window.livingPaperMotion = (changes) => { Object.assign(motion, changes); applyMotion(); wake(); return { ...motion }; };
 
   gl.activeTexture(gl.TEXTURE2);
@@ -786,12 +1021,16 @@
       else return loadImage(cfg.sky, skyTex);
     })
     : loadImage(cfg.sky, skyTex));
-  cfg.stills.forEach((src, i) => ready.push(loadImage(src, stillTex[i])));
+  const loadStill = i => loadImage(cfg.stills[i], stillTex[i]).then(() => { stillIn[i] = true; });
   addEventListener('scroll', () => { update(); wake(); }, { passive: true });
   // A resize clears the canvas: draw again at once.
   addEventListener('resize', () => { layout(); wake(); });
   layout();
+  // The paper wash is measured from the words, which move once the fonts arrive.
+  if (phone && document.fonts && document.fonts.ready) document.fonts.ready.then(() => { layout(); wake(); });
   landOnHash();
+  landed = [Math.floor(state().light), Math.ceil(state().light)];
+  [...new Set(landed)].forEach(i => ready.push(loadStill(i)));
   // If the paintings take a moment, say so where the scroll hint sits.
   const washTimer = setTimeout(() => { if (hint && !document.body.classList.contains('lp-live')) hint.textContent = 'the coast is being painted…'; }, 1200);
   Promise.all(ready).then(() => {
@@ -810,8 +1049,10 @@
     document.documentElement.classList.remove('lp-opening');
     running = true;
     wake();
-    // Then the water, then the two scroll clips, so neither competes with the paintings for the first view.
-    loadWater().then(loadClips);
+    // Then the water (it moves in the first view), then the other paintings, then the two scroll clips: each
+    // has the connection to itself, and none competes with the first view.
+    const others = () => Promise.all(cfg.stills.map((_, i) => i).filter(i => !stillIn[i]).map(i => loadStill(i).then(() => { update(); wake(); })));
+    loadWater().then(others).then(loadClips);
   });
 
   // ?tune: sliders for the amounts, on the real page. Juan sends the numbers; they go into LIVING_PAPER.motion.
@@ -821,7 +1062,7 @@
     panel.innerHTML = '<b>Tune</b>' + [
       ['breath', 'Edge breathing', 0, 2.5, 0.05], ['breathPeriod', 'Breath period (s)', 3, 20, 0.5], ['rim', 'Drying rim', 0, 1.5, 0.05],
       ['wet', 'Wet paper under the cursor', 0, 2.5, 0.05], ['lightUp', 'Lanterns light up under the cursor', 0, 2.5, 0.05], ['stars', 'Stars twinkle where the cursor passes', 0, 2.5, 0.05], ['dry', 'How dry the painting rests', 0, 0.5, 0.01], ['wetTint', 'Blue tint of the water', 0, 1.5, 0.05], ['wetChange', 'Wet while the light changes', 0, 2, 0.05],
-      ['water', 'Water sway', 0, 3, 0.05], ['ripples', 'Ripple lines', 0, 3, 0.05], ['sparkle', 'Sparkle', 0, 3, 0.05], ['trees', 'Pines sway', 0, 3, 0.05], ['gust', 'Breeze', 0, 3, 0.05]]
+      ['gulls', 'Seagulls at sunset', 0, 1, 1], ['water', 'Water sway', 0, 3, 0.05], ['ripples', 'Ripple lines', 0, 3, 0.05], ['sparkle', 'Sparkle', 0, 3, 0.05], ['trees', 'Pines sway', 0, 3, 0.05], ['gust', 'Breeze', 0, 3, 0.05]]
       .map(([k, label, min, max, step]) => `<label>${label} <input name="${k}" type="range" min="${min}" max="${max}" step="${step}" value="${motion[k]}"><output>${motion[k]}</output></label>`).join('')
       + `<label>Bloom seconds <input name="bloom" type="range" min="0.5" max="8" step="0.1" value="${BLOOM}"><output>${BLOOM}</output></label><button type="button">Bloom again</button><code></code>`;
     document.body.appendChild(panel);

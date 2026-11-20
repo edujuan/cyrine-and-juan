@@ -140,3 +140,55 @@ a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
   .lp-cursor-dot.is-down { width: 5px; height: 5px; margin: -2.5px 0 0 -2.5px; border-color: transparent; background: rgba(244, 234, 216, 1); }
 }
 @media (prefers-reduced-motion: reduce) { .lp-cursor-dot { display: none; } body.lp-cursor, body.lp-cursor * { cursor: auto !important; } }
+
+/* Upright phones (lp-phone, narrower than 4:5): the tall painting fills the screen edge to edge. The names sit in
+   the pale sky at the top, the details and buttons on the pale sand at the bottom over a soft paper wash, and the
+   three scenes run as a strip along the foot with the progress line under them (option 7, Juan, 2026-11-20). */
+.lp-fallback picture + picture img { opacity: 0; }
+.lp-wash { display: none; }
+.lp-more { display: none; }
+/* Paper washes over the painting: across the top, so the titles sit on pale paper in every light, and from the
+   bottom, exactly as high as the scene's text (--wash, measured by the runtime), with a short fade above it. */
+.lp-phone .lp-wash { display: block; position: fixed; z-index: 1; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(248, 243, 234, 0.92) 0, rgba(248, 243, 234, 0.65) 12svh, rgba(248, 243, 234, 0) 25svh),
+    linear-gradient(to top, rgba(248, 243, 234, 0.98) 0, rgba(248, 243, 234, 0.96) var(--wash, 44px), rgba(248, 243, 234, 0.5) calc(var(--wash, 44px) + 3svh), rgba(248, 243, 234, 0) calc(var(--wash, 44px) + 8svh)); }
+.lp-phone .lp-header { display: none; }
+.lp-phone .lp-copy { left: 22px; right: 22px; width: auto; top: calc(env(safe-area-inset-top, 0px) + 7svh); bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
+  transform: none; align-items: center; text-align: center; gap: 8px; }
+.lp-phone .lp-eyebrow { margin: 0; font-size: 1.25rem; }
+.lp-phone .lp-copy h1, .lp-phone .lp-copy h2 { font-size: clamp(2.3rem, 10.5vw, 3rem); line-height: 1.02; text-wrap: balance; }
+.lp-phone .lp-sub { font-size: 16px; }
+/* Everything after the title goes down to the sand. */
+.lp-phone .lp-rsvp, .lp-phone .lp-programme, .lp-phone .lp-facts { margin-top: auto; }
+.lp-phone .lp-rsvp { align-items: center; padding-top: 0; border-top: 0; }
+/* The chapter strip right below already leads to the weekend (Juan, 2026-11-20). */
+.lp-phone .lp-rsvp .lp-link { display: none; }
+/* The two list scenes arrive folded, so the painting leads: only the title and one button. A tap unfolds the list
+   onto a paper wash; it folds again after half a minute (living-paper.js). Juan, 2026-11-20. */
+.lp-phone .lp-more { display: inline-flex; align-items: center; gap: 10px; margin-top: auto; min-height: 56px; padding: 14px 34px 16px; border: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 84' preserveAspectRatio='none'%3E%3Cdefs%3E%3Cfilter id='e' x='-8%' y='-25%' width='116%' height='150%'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.022 0.05' numOctaves='3' seed='11' result='n'/%3E%3CfeDisplacementMap in='SourceGraphic' in2='n' scale='15' xChannelSelector='R' yChannelSelector='G' result='d'/%3E%3CfeGaussianBlur in='d' stdDeviation='0.5' result='s'/%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.09 0.14' numOctaves='2' seed='4' result='g'/%3E%3CfeColorMatrix in='g' type='matrix' values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.5 0 0 0 0.72' result='ga'/%3E%3CfeComposite in='s' in2='ga' operator='in'/%3E%3C/filter%3E%3CradialGradient id='w' cx='46%' cy='48%' r='62%'%3E%3Cstop offset='0' stop-color='%2322314a'/%3E%3Cstop offset='0.7' stop-color='%231e2a3b'/%3E%3Cstop offset='1' stop-color='%23151e2c'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cg filter='url(%23e)'%3E%3Cpath d='M24 44 C20 24 52 14 92 15 C128 11 176 12 212 18 C240 22 246 40 236 54 C226 68 186 71 146 70 C108 73 58 72 38 64 C28 60 24 52 24 44 Z' fill='url(%23w)'/%3E%3Ccircle cx='14' cy='58' r='2.6' fill='%231e2a3b'/%3E%3Ccircle cx='247' cy='27' r='2' fill='%231e2a3b'/%3E%3Ccircle cx='8' cy='40' r='1.2' fill='%231e2a3b'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat;
+  color: var(--paper); font: italic 500 21px/1 var(--display); letter-spacing: 0.01em; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.5s ease, opacity 0.4s; }
+/* An ink blot dropped on the sand, in the painting's indigo, with a torn wet edge and two specks of splatter. */
+.lp-phone .lp-more:active { transform: scale(0.97); }
+.lp-phone .lp-more::after { content: ""; width: 7px; height: 7px; margin-top: 4px; border-top: 1.3px solid currentColor; border-right: 1.3px solid currentColor; opacity: 0.85; transform: rotate(-45deg); transition: transform 0.4s; }
+.lp-phone .lp-fold.is-open .lp-more { min-height: 38px; padding: 8px 14px; background: none; color: var(--ink-soft); font-size: 17px; }
+.lp-phone .lp-fold.is-open .lp-more::after { margin-top: -4px; transform: rotate(135deg); }
+.lp-phone .lp-fold > .lp-programme, .lp-phone .lp-fold > .lp-facts { margin-top: 0; }
+.lp-phone .lp-fold:not(.is-open) > .lp-programme, .lp-phone .lp-fold:not(.is-open) > .lp-facts, .lp-phone .lp-fold:not(.is-open) > .lp-actions { display: none; }
+.lp-phone .lp-fold.is-open > .lp-programme, .lp-phone .lp-fold.is-open > .lp-facts, .lp-phone .lp-fold.is-open > .lp-actions { animation: lp-unfold 0.5s ease both; }
+@keyframes lp-unfold { from { opacity: 0; transform: translateY(10px); } }
+.lp-phone .lp-actions { justify-content: center; }
+.lp-phone .lp-programme, .lp-phone .lp-facts { width: 100%; text-align: left; }
+.lp-phone .lp-programme li { gap: 12px; padding: 9px 0; }
+.lp-phone .lp-programme b { width: 92px; font-size: 14px; }
+.lp-phone .lp-programme span { font-size: 15px; }
+.lp-phone .lp-facts { grid-template-columns: 112px minmax(0, 1fr); }
+.lp-phone .lp-facts dt, .lp-phone .lp-facts dd { padding: 8px 0; font-size: 14.5px; }
+.lp-phone .lp-button--big.lp-button--primary { min-height: 50px; padding: 14px 28px; font-size: 16px; }
+.lp-phone .lp-button--big { padding: 12px 22px; font-size: 15px; }
+.lp-phone .lp-foot { left: 22px; right: 22px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); flex-direction: column-reverse; align-items: stretch; gap: 8px; text-shadow: none; }
+.lp-phone .lp-hint { display: none; }
+.lp-phone .lp-scenes { justify-content: space-between; gap: 8px; font: 500 11px/1 var(--text); letter-spacing: 0.12em; text-transform: uppercase; }
+.lp-phone .lp-scenes a { padding: 6px 0; border-bottom: 0; }
+.lp-phone .lp-progress { width: 100%; }
+body.lp-phone .lp-fallback img { left: 0; right: 0; width: 100%; height: 100%; object-fit: cover; }

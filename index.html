@@ -9,8 +9,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&display=swap">
-  <link rel="preload" as="image" href="assets/images/live/01-sunset.jpg">
-  <link rel="stylesheet" href="home.css?v=4-rest">
+  <link rel="preload" as="image" href="assets/images/live/01-sunset.jpg" media="(min-aspect-ratio: 4/5)" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/images/live-phone/01-sunset.jpg" media="(max-aspect-ratio: 4/5)" fetchpriority="high">
+  <link rel="stylesheet" href="home.css?v=13-phone">
   <link rel="stylesheet" href="scrollbar.css">
   <script>
     window.LIVING_PAPER = {
@@ -19,10 +20,11 @@
       // The nightfall clip sets the sun, then brings out the stars.
       // Land stays on the aligned paintings; water keeps its independent clock.
       clips: ['assets/video/clips/12-sunset-to-dusk.mp4', 'assets/video/clips/23-nightfall-sun-stars.mp4'],
-      // One continuous water video; scroll changes only its smooth colour grade.
-      waterLoop: 'assets/video/clips/water-loop.mp4?v=rgb-1',
-      waterLighting: 'assets/images/live/water-lighting.png?v=4-sky',
-      mask: 'assets/images/live/live-mask.png?v=3-shore',
+      // One continuous water video, made for the water alone (swell and small waves running up the sand,
+      // scripts/desktop_water_loop.py); scroll changes only its smooth colour grade.
+      waterLoop: 'assets/video/clips/water-loop-waves.mp4?v=2',
+      waterLighting: 'assets/images/live/water-lighting.png?v=6-gulls',
+      mask: 'assets/images/live/live-mask.png?v=5-swash',
       sky: 'assets/images/live/live-sky.png?v=4-trees',
       aspect: 2400 / 1348,
       // Screens of scroll: a short rest on the first scene so the sunset starts almost at once.
@@ -89,7 +91,53 @@
       motion: { water: 1, ripples: 1, sparkle: 1, speed: 1, trees: 0.5, gust: 0.5, breath: 1, breathPeriod: 8, rim: 0.5, wet: 1, wetChange: 0.5, dry: 0.15, wetTint: 0.5 },
       // The painting blooms in on load like a watercolour wash, from the sun outward, over this many seconds.
       bloom: 6.5,
-      seed: [0.62, 0.5]
+      seed: [0.62, 0.5],
+      // Upright phones (narrower than 4:5): a painting composed for a tall screen, filling it edge to edge, with the
+      // sunset over the bay and the village on the cliff (approved by Juan, 2026-11-20). Masks, lights and the
+      // water band are traced on it (assets/images/portrait/phone-live-shapes.json, phone-lights.json).
+      phone: {
+        maxAspect: 0.8,
+        stills: ['assets/images/live-phone/01-sunset.jpg', 'assets/images/live-phone/02-dusk.jpg', 'assets/images/live-phone/03-night.jpg'],
+        // The sun sets in the clip; dusk to night is drawn from the two paintings (lights and stars come on one by one).
+        clips: ['assets/video/clips/phone-12-sunset-to-dusk-web.mp4', null],
+        waterLoop: 'assets/video/clips/phone-water-loop.mp4?v=1',
+        waterLighting: 'assets/images/live-phone/water-lighting.png?v=3-gulls',
+        mask: 'assets/images/live-phone/live-mask.png?v=3-lanterns',
+        sky: 'assets/images/live-phone/live-sky.png?v=2-roofs',
+        aspect: 1408 / 3072,
+        focus: [0.5, 0.5],
+        waterBand: [0.496, 0.37],
+        meteor: { start: [0.15, 0.9, 0.17, 0.3], vanish: [0.25, 0.6, 0.47] },
+        seed: [0.465, 0.382],
+        // A door by the pine is 15 px to the metre of this painting's 3072, so the pine is some 140 m away.
+        gulls: { tree: [0.69, 0.428], away: [0.4, 0.44], eye: [0.5, 0.496], focal: 0.684, distance: 140, circleAt: 170, gone: [300, 480], magnify: 2.5, behind: 0.62 },
+        paper: [[249, 244, 235], [246, 240, 232], [245, 234, 221]],
+        // Lanterns on the beach (set by hand), then lit windows in the village (found in the night painting).
+        lights: [
+          [0.381, 0.802, 1.0],
+          [0.621, 0.733, 0.6],
+          [0.722, 0.698, 0.5],
+          [0.794, 0.702, 0.45],
+          [0.843, 0.674, 0.3],
+          [0.815, 0.655, 0.25],
+          [0.784, 0.646, 0.2],
+          [0.766, 0.636, 0.18],
+          [0.92898, 0.54232, 0.19],
+          [0.71165, 0.53776, 0.35],
+          [0.67188, 0.5319, 0.35],
+          [0.9517, 0.52604, 0.35],
+          [0.80256, 0.52148, 0.35],
+          [0.87358, 0.51693, 0.23],
+          [0.6321, 0.51367, 0.12],
+          [0.89205, 0.49805, 0.12],
+          [0.92756, 0.49414, 0.35],
+          [0.94886, 0.49349, 0.35],
+          [0.75, 0.48633, 0.12],
+          [0.87074, 0.48177, 0.35],
+          [0.90767, 0.47721, 0.12],
+          [0.78693, 0.46419, 0.19]
+        ]
+      }
     };
     // Start on bare paper, before images can flash ahead of the live reveal.
     // If the renderer cannot start, leave the ordinary still-page fallback.
@@ -98,17 +146,20 @@
       setTimeout(() => document.documentElement.classList.remove('lp-opening'), 8000);
     }
   </script>
-  <script src="src/living-paper.js?v=4-rest" defer></script>
+  <script src="src/living-paper.js?v=20-pace" defer></script>
   <script src="src/cursor.js?v=4-rest" defer></script>
   <script src="src/scrollbar.js" defer></script>
 </head>
 <body>
   <canvas id="paper" aria-hidden="true"></canvas>
+  <!-- Plain stills for when the painting cannot be drawn. Dusk and night are named in data attributes, so they
+       do not download beside the first painting; living-paper.js switches them on if they are needed. -->
   <div class="lp-fallback" aria-hidden="true">
-    <img src="assets/images/live/01-sunset.jpg" alt="">
-    <img src="assets/images/live/02-dusk.jpg" alt="">
-    <img src="assets/images/live/03-night.jpg" alt="">
+    <picture><source media="(max-aspect-ratio: 4/5)" srcset="assets/images/live-phone/01-sunset.jpg"><img src="assets/images/live/01-sunset.jpg" alt=""></picture>
+    <picture><source media="(max-aspect-ratio: 4/5)" data-srcset="assets/images/live-phone/02-dusk.jpg"><img data-src="assets/images/live/02-dusk.jpg" alt=""></picture>
+    <picture><source media="(max-aspect-ratio: 4/5)" data-srcset="assets/images/live-phone/03-night.jpg"><img data-src="assets/images/live/03-night.jpg" alt=""></picture>
   </div>
+  <div class="lp-wash" aria-hidden="true"></div>
 
   <header class="lp-header" data-tone="light">
     <a class="lp-brand" href="#invitation">
@@ -135,10 +186,11 @@
       </div>
     </article>
 
-    <article class="lp-copy" aria-labelledby="h-weekend">
+    <article class="lp-copy lp-fold" aria-labelledby="h-weekend">
       <p class="lp-eyebrow">What we know so far</p>
       <h2 id="h-weekend">The weekend</h2>
-      <ol class="lp-programme">
+      <button class="lp-more" type="button" aria-expanded="false" aria-controls="weekend-list" data-closed="The programme" data-open="Close">The programme</button>
+      <ol class="lp-programme" id="weekend-list">
         <li><b>Fri 21 May</b><span>Outia · traditional Tunisian wedding</span></li>
         <li><b>Sat 22 May</b><span>City tour (optional)</span></li>
         <li><b>Sun 23 May</b><span>The wedding</span></li>
@@ -146,10 +198,11 @@
       <p class="lp-actions"><a class="lp-link" href="rsvp/">RSVP</a><a class="lp-link" href="logistics/#weekend">Weekend details</a></p>
     </article>
 
-    <article class="lp-copy" aria-labelledby="h-logistics">
+    <article class="lp-copy lp-fold" aria-labelledby="h-logistics">
       <p class="lp-eyebrow">Plan your trip</p>
       <h2 id="h-logistics">Getting there</h2>
-      <dl class="lp-facts">
+      <button class="lp-more" type="button" aria-expanded="false" aria-controls="travel-list" data-closed="Travel essentials" data-open="Close">Travel essentials</button>
+      <dl class="lp-facts" id="travel-list">
         <dt>Fly into</dt><dd>Tunis-Carthage (TUN)</dd>
         <dt>Transport</dt><dd>Shuttles planned</dd>
         <dt>Where to stay</dt><dd><a class="lp-link" href="logistics/#stay">Three hotel ideas</a></dd>
