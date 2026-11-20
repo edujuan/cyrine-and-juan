@@ -60,10 +60,13 @@
   let band = false;
   function layout() {
     if (base.phone && (innerWidth / innerHeight < PHONE_MAX) !== phone) { location.reload(); return; }
-    vh = innerHeight;
     band = phone || innerWidth / innerHeight < 1.15;
     document.body.classList.toggle('lp-band', band && !phone);
     document.body.classList.toggle('lp-phone', phone);
+    // On a phone the browser's toolbar hides and shows as you scroll, and the visible height changes with it
+    // (a resize each time, in the middle of a scroll). So there a screen of scroll is the painting's own height,
+    // which home.css keeps at the screen with the toolbar hidden: nothing is measured again, nothing jumps.
+    vh = phone ? canvas.clientHeight || innerHeight : innerHeight;
     track.style.height = `${(TOTAL + 1) * vh}px`;
     anchors.forEach((a, i) => { a.style.top = `${(STARTS[i] + (i ? RESTS[i] * 0.4 : 0)) * vh}px`; });
     if (gl) resize();
@@ -76,7 +79,7 @@
   function measureWash() {
     washTarget = copies.map((copy) => {
       const top = copy.classList.contains('is-open') && copy.querySelector('.lp-more');
-      return top ? Math.max(44, vh - top.getBoundingClientRect().top + 4) : 44;
+      return top ? Math.max(44, innerHeight - top.getBoundingClientRect().top + 4) : 44;
     });
   }
   function tweenWash() {
@@ -765,8 +768,9 @@
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    // Setting a canvas's size clears it, even to the size it has: leave it alone when nothing changed.
+    if (canvas.width !== Math.round(w * dpr)) canvas.width = Math.round(w * dpr);
+    if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
     gl.viewport(0, 0, canvas.width, canvas.height);
     if (phone) {
       // Upright phones: the tall painting covers the whole screen, cropped around cfg.focus where the screen differs.
@@ -1003,8 +1007,9 @@
     gullPace = !busy && gullFps > 26;
     frames[busy || gullPace ? 'busy' : 'rest']++;
     if (busy || gullPace) pending = requestAnimationFrame(frame);
-    // At rest: the water video's next frame wakes the page; this timer is only the fallback.
-    else rest(waterVideo && !waterVideo.paused && frameCallbacks ? 1000 / 16 : 1000 / REST_FPS);
+    // At rest: the water video's next frame wakes the page; this timer is only the fallback. Where the browser
+    // has frame callbacks but does not send them (none in the last half second), the timer keeps the water's pace.
+    else rest(waterVideo && !waterVideo.paused && frameCallbacks && now - waterCallbackAt < 500 ? 1000 / 16 : 1000 / REST_FPS);
   }
   canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); console.warn('living paper: WebGL context lost', e); });
   canvas.addEventListener('webglcontextrestored', () => { console.warn('living paper: WebGL context restored; reload the page to rebuild'); });

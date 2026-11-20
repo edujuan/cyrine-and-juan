@@ -153,6 +153,10 @@ a:focus-visible { outline: 2px solid #b08a3e; outline-offset: 3px; }
   background:
     linear-gradient(to bottom, rgba(248, 243, 234, 0.92) 0, rgba(248, 243, 234, 0.65) 12svh, rgba(248, 243, 234, 0) 25svh),
     linear-gradient(to top, rgba(248, 243, 234, 0.98) 0, rgba(248, 243, 234, 0.96) var(--wash, 44px), rgba(248, 243, 234, 0.5) calc(var(--wash, 44px) + 3svh), rgba(248, 243, 234, 0) calc(var(--wash, 44px) + 8svh)); }
+/* A phone browser's toolbar hides and shows as you scroll, and the visible height changes with it. The painting
+   keeps the height of the screen with the toolbar hidden (100vh is that height on iOS; lvh says it outright), so
+   it never rescales in the middle of a scroll; while the toolbar shows, it covers the painting's foot. */
+.lp-phone #paper, .lp-phone .lp-fallback { bottom: auto; height: 100vh; height: 100lvh; }
 .lp-phone .lp-header { display: none; }
 .lp-phone .lp-copy { left: 22px; right: 22px; width: auto; top: calc(env(safe-area-inset-top, 0px) + 7svh); bottom: calc(env(safe-area-inset-bottom, 0px) + 66px);
   transform: none; align-items: center; text-align: center; gap: 8px; }
